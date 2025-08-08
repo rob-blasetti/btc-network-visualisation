@@ -329,14 +329,18 @@ function tryLoadInOrder(urls, onSuccess, onFail) {
   );
 }
 
+// Resolve public/ assets respecting Vite base path
+function assetUrl(p) {
+  const base = import.meta.env.BASE_URL || '/';
+  return `${base}${p.replace(/^\/+/, '')}`;
+}
+
 // Prefer local assets under /public/maps, fallback to remote
 tryLoadInOrder(
   [
-    '/maps/world-dark-4096.jpg',
-    '/maps/world-dark-2048.jpg',
-    '/maps/world-dark-2048.png',
-    'https://upload.wikimedia.org/wikipedia/commons/thumb/2/29/BlankMap-World-v2-dark-gray.svg/1024px-BlankMap-World-v2-dark-gray.svg.png',
-    'https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/World_map_-_low_resolution.png/1024px-World_map_-_low_resolution.png'
+    assetUrl('maps/world-dark-4096.jpg'),
+    assetUrl('maps/world-dark-2048.jpg'),
+    assetUrl('maps/world-dark-2048.png')
   ],
   (tex) => {
     tex.anisotropy = MAX_ANISO;
@@ -393,9 +397,9 @@ scene.add(boundaryPlane);
 
 tryLoadInOrder(
   [
-    '/maps/world-admin0-boundaries-4096.png',
-    '/maps/world-admin0-boundaries-2048.png',
-    '/maps/world-coastlines-2048.png'
+    assetUrl('maps/world-admin0-boundaries-4096.png'),
+    assetUrl('maps/world-admin0-boundaries-2048.png'),
+    assetUrl('maps/world-coastlines-2048.png')
   ],
   (tex) => {
     tex.anisotropy = MAX_ANISO;
