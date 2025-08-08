@@ -67,6 +67,11 @@ const elAttempts = document.getElementById('mining-attempts');
 const elElapsed = document.getElementById('mining-elapsed');
 const elProgress = document.getElementById('mining-progress');
 const elWinner = document.getElementById('mining-winner');
+// Header compact stats (declare early to avoid TDZ)
+var elHdrHeight = document.getElementById('hdr-height');
+var elHdrSince = document.getElementById('hdr-since');
+var elHdrEta = document.getElementById('hdr-eta');
+var elHdrSubsidy = document.getElementById('hdr-subsidy');
 
 // Geo-clustered node distribution
 const nodeData = generateSampleNodes();
@@ -468,11 +473,6 @@ if (hudEl && hudToggle) {
 // Potential sources: mempool.space websocket, Bitcoin Core ZMQ, or public APIs.
 
 // Live data: Blockchain.info WS unconfirmed txs -> pulses between random nodes
-// Header compact stats
-const elHdrHeight = document.getElementById('hdr-height');
-const elHdrSince = document.getElementById('hdr-since');
-const elHdrEta = document.getElementById('hdr-eta');
-const elHdrSubsidy = document.getElementById('hdr-subsidy');
 let txCountWindow = [];
 let txCountWindow5m = [];
 let txByContMinute = new Map();
