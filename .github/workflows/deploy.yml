@@ -20,6 +20,31 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Fetch bundled map images (optional)
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p public/maps
+          fetch_into() {
+            out="$1"; shift
+            for url in "$@"; do
+              echo "Trying $url -> $out"
+              if curl -L --fail --silent --show-error "$url" -o "$out"; then
+                echo "Fetched $out from $url"
+                return 0
+              fi
+            done
+            echo "No source available for $out (skipping)"
+            return 0
+          }
+          # Dark basemap candidates (public-domain/CC BY-SA sources)
+          fetch_into public/maps/world-dark-2048.jpg \
+            "https://upload.wikimedia.org/wikipedia/commons/8/80/World_map_-_low_resolution.png" \
+            "https://upload.wikimedia.org/wikipedia/commons/2/21/World_map_with_four_colours.svg" # fallback SVG as raster may fail
+          # Boundaries overlay (transparent) candidates
+          fetch_into public/maps/world-admin0-boundaries-2048.png \
+            "https://upload.wikimedia.org/wikipedia/commons/4/4a/BlankMap-World_White.svg" \
+            "https://upload.wikimedia.org/wikipedia/commons/8/80/World_map_-_low_resolution.png"
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
