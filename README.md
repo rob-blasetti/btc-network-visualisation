@@ -50,6 +50,11 @@ Map overlay & controls:
 - OrbitControls: left-drag orbit, right-drag pan, wheel zoom.
 - You can tweak pan/zoom speeds in `src/main.js` (look for `OrbitControls` settings).
 
+Continents & visibility:
+- Nodes are colored by continent; pulses adopt source continent color.
+- Semi-transparent continent outlines and labels group regional clusters.
+- Edges have a subtle additive glow; pulses now use additive sprites for clearer flow.
+
 ## License
 
 MIT

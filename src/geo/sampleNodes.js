@@ -1,4 +1,5 @@
 import { getCountry } from './countries.js';
+import { getContinent } from './continents.js';
 import { projectLatLon, jitterAround } from './layout.js';
 
 // Generate demo nodes with country codes and approximate lat/lon clustering.
@@ -29,10 +30,11 @@ export function generateSampleNodes() {
   for (const [code, count] of countries) {
     const c = getCountry(code);
     if (!c) continue;
+    const cont = getContinent(code);
     const { x, z } = projectLatLon(c.lat, c.lon, scale);
     for (let i = 0; i < count; i++) {
       const j = jitterAround(x, z, 3.5);
-      nodes.push({ x: j.x, y: (Math.random() * 0.6 - 0.3), z: j.z, country: code });
+      nodes.push({ x: j.x, y: (Math.random() * 0.6 - 0.3), z: j.z, country: code, continent: cont?.code });
     }
   }
   return nodes;
@@ -57,4 +59,3 @@ export function computeCountryBackdrops(nodes) {
   }
   return out;
 }
-

@@ -3,6 +3,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { connectUnconfirmedTxs } from './data/blockchainInfoWS.js';
 import { generateSampleNodes, computeCountryBackdrops } from './geo/sampleNodes.js';
 import { COUNTRIES } from './geo/countries.js';
+import { CONTINENT_INFO } from './geo/continents.js';
 
 const canvas = document.getElementById('scene');
 
@@ -41,14 +42,17 @@ controls.maxDistance = 800;
 const nodeData = generateSampleNodes();
 const nodes = [];
 
-const nodeGeom = new THREE.SphereGeometry(1.1, 16, 16);
-const nodeMat = new THREE.MeshStandardMaterial({ color: 0xf7931a, emissive: 0x2a1200, metalness: 0.2, roughness: 0.4 });
+const nodeGeom = new THREE.SphereGeometry(1.25, 20, 20);
 const nodeGroup = new THREE.Group();
 
 for (const n of nodeData) {
+  const contColor = CONTINENT_INFO[n.continent]?.color ?? 0xf7931a;
+  const nodeMat = new THREE.MeshStandardMaterial({ color: contColor, emissive: contColor & 0x222222, metalness: 0.25, roughness: 0.5 });
+  nodeMat.emissiveIntensity = 0.35;
   const mesh = new THREE.Mesh(nodeGeom, nodeMat);
   mesh.position.set(n.x, n.y, n.z);
   mesh.userData.country = n.country;
+  mesh.userData.continent = n.continent;
   nodes.push(mesh.position.clone());
   nodeGroup.add(mesh);
 }
@@ -87,7 +91,7 @@ const backdrops = computeCountryBackdrops(nodeData);
 for (const b of backdrops) {
   const tex = makeBackdropTexture(b.country);
   const geo = new THREE.PlaneGeometry(b.size, b.size);
-  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.85, depthWrite: false });
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.78, depthWrite: false });
   const plane = new THREE.Mesh(geo, mat);
   plane.position.set(b.x, -2.5, b.z);
   plane.rotation.x = -Math.PI / 2; // lay flat on XZ
@@ -95,6 +99,80 @@ for (const b of backdrops) {
   backdropGroup.add(plane);
 }
 scene.add(backdropGroup);
+
+// Continent outlines and labels
+const continentGroup = new THREE.Group();
+const byCont = new Map();
+nodeGroup.children.forEach((m) => {
+  const k = m.userData.continent || 'NA';
+  const arr = byCont.get(k) || [];
+  arr.push(m.position);
+  byCont.set(k, arr);
+});
+
+function makeCircleGeom(segments = 128) {
+  return new THREE.CircleGeometry(1, segments);
+}
+
+function makeLabelSprite(text, color = '#ffffff') {
+  const size = 256;
+  const c = document.createElement('canvas');
+  c.width = size; c.height = size;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = 'rgba(0,0,0,0)';
+  ctx.fillRect(0,0,size,size);
+  ctx.fillStyle = color;
+  ctx.font = 'bold 64px Inter, system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(0,0,0,0.6)';
+  ctx.shadowBlur = 8;
+  ctx.fillText(text, size/2, size/2);
+  const tex = new THREE.CanvasTexture(c);
+  tex.anisotropy = 4;
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
+  const sp = new THREE.Sprite(mat);
+  sp.scale.set(28, 14, 1);
+  return sp;
+}
+
+for (const [code, list] of byCont) {
+  if (list.length < 2) continue;
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  for (const p of list) {
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.z < minZ) minZ = p.z;
+    if (p.z > maxZ) maxZ = p.z;
+  }
+  const cx = (minX + maxX) / 2;
+  const cz = (minZ + maxZ) / 2;
+  const rx = Math.max(12, (maxX - minX) * 0.7);
+  const rz = Math.max(10, (maxZ - minZ) * 0.8);
+
+  const color = CONTINENT_INFO[code]?.color ?? 0xffffff;
+  const circleGeom = makeCircleGeom();
+  const fillMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.08, depthWrite: false });
+  const outlineMat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.5 });
+
+  const fill = new THREE.Mesh(circleGeom, fillMat);
+  fill.position.set(cx, -2.9, cz);
+  fill.rotation.x = -Math.PI / 2;
+  fill.scale.set(rx, rz, 1);
+
+  const outline = new THREE.LineLoop(circleGeom, outlineMat);
+  outline.position.set(cx, -2.89, cz);
+  outline.rotation.x = -Math.PI / 2;
+  outline.scale.set(rx, rz, 1);
+
+  const label = makeLabelSprite(CONTINENT_INFO[code]?.name ?? code, '#e6edf3');
+  label.position.set(cx, 2.0, cz);
+
+  continentGroup.add(fill);
+  continentGroup.add(outline);
+  continentGroup.add(label);
+}
+scene.add(continentGroup);
 
 // Edges as line segments (prefer within-country connections)
 const connectionsPerNode = 2;
@@ -125,24 +203,47 @@ for (let i = 0; i < nodeCount; i++) {
 
 const edgeGeom = new THREE.BufferGeometry();
 edgeGeom.setAttribute('position', new THREE.Float32BufferAttribute(edgePositions, 3));
-const edgeMat = new THREE.LineBasicMaterial({ color: 0x425a75, transparent: true, opacity: 0.5 });
+const edgeMat = new THREE.LineBasicMaterial({ color: 0x6b8aa8, transparent: true, opacity: 0.65 });
 const edges = new THREE.LineSegments(edgeGeom, edgeMat);
 scene.add(edges);
+// Add a soft additive glow for edges
+const edgeGlowMat = new THREE.LineBasicMaterial({ color: 0x98b7d6, transparent: true, opacity: 0.15, blending: THREE.AdditiveBlending, depthWrite: false });
+const edgesGlow = new THREE.LineSegments(edgeGeom.clone(), edgeGlowMat);
+edgesGlow.position.y = 0.01;
+scene.add(edgesGlow);
 
-// Pulses for live transactions
+// Pulses for live transactions (additive glowing sprites)
 const pulses = [];
-const pulseGeom = new THREE.SphereGeometry(0.25, 12, 12);
-const pulseMat = new THREE.MeshBasicMaterial({ color: 0xffc680 });
+let pulseTexture;
+function getPulseTexture() {
+  if (pulseTexture) return pulseTexture;
+  const size = 128;
+  const c = document.createElement('canvas');
+  c.width = size; c.height = size;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+  g.addColorStop(0.0, 'rgba(255,220,160,1)');
+  g.addColorStop(0.4, 'rgba(255,160,60,0.8)');
+  g.addColorStop(1.0, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(size/2, size/2, size/2, 0, Math.PI*2);
+  ctx.fill();
+  pulseTexture = new THREE.CanvasTexture(c);
+  pulseTexture.anisotropy = 4;
+  pulseTexture.needsUpdate = true;
+  return pulseTexture;
+}
 
-function addPulse(a, b) {
-  const mesh = new THREE.Mesh(pulseGeom, pulseMat.clone());
-  mesh.position.copy(a);
-  mesh.material.transparent = true;
-  mesh.material.opacity = 1.0;
-  const speed = 0.012 + Math.random() * 0.02; // lerp per frame
-  pulses.push({ mesh, a: a.clone(), b: b.clone(), t: 0, speed });
-  scene.add(mesh);
-  // optional: slight scale flicker
+function addPulse(a, b, color = 0xffa34d) {
+  const tex = getPulseTexture();
+  const mat = new THREE.SpriteMaterial({ map: tex, color, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, opacity: 0.9 });
+  const sprite = new THREE.Sprite(mat);
+  sprite.position.copy(a);
+  sprite.scale.set(2.6, 2.6, 1);
+  const speed = 0.02 + Math.random() * 0.03; // faster for visibility
+  pulses.push({ mesh: sprite, a: a.clone(), b: b.clone(), t: 0, speed });
+  scene.add(sprite);
 }
 
 // World map overlay (equirectangular) aligned with our lat/lon projection
@@ -151,7 +252,7 @@ const MAP_SCALE = 1.2;
 const mapWidth = 360 * MAP_SCALE;
 const mapHeight = 180 * MAP_SCALE;
 const mapGeo = new THREE.PlaneGeometry(mapWidth, mapHeight, 1, 1);
-const mapMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 });
+const mapMat = new THREE.MeshBasicMaterial({ color: 0x8898a6, transparent: true, opacity: 0.35 });
 const worldMap = new THREE.Mesh(mapGeo, mapMat);
 worldMap.position.set(0, -3, 0);
 worldMap.rotation.x = -Math.PI / 2; // lie on XZ
@@ -162,7 +263,7 @@ scene.add(worldMap);
 const texLoader = new THREE.TextureLoader();
 texLoader.setCrossOrigin('anonymous');
 texLoader.load(
-  'https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/World_map_-_low_resolution.png/1024px-World_map_-_low_resolution.png',
+  'https://upload.wikimedia.org/wikipedia/commons/thumb/2/29/BlankMap-World-v2-dark-gray.svg/1024px-BlankMap-World-v2-dark-gray.svg.png',
   (tex) => {
     tex.anisotropy = 4;
     tex.colorSpace = THREE.SRGBColorSpace;
@@ -171,10 +272,25 @@ texLoader.load(
   },
   undefined,
   () => {
-    // If texture fails, keep a subtle grid as fallback
-    const grid = new THREE.GridHelper(mapWidth + 20, 46, 0x2d3847, 0x1a2432);
-    grid.position.y = -3.1;
-    scene.add(grid);
+    // Fallback to lighter map and tint darker
+    texLoader.load(
+      'https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/World_map_-_low_resolution.png/1024px-World_map_-_low_resolution.png',
+      (tex2) => {
+        tex2.anisotropy = 4;
+        tex2.colorSpace = THREE.SRGBColorSpace;
+        mapMat.map = tex2;
+        mapMat.color.setHex(0x708090);
+        mapMat.opacity = 0.4;
+        mapMat.needsUpdate = true;
+      },
+      undefined,
+      () => {
+        // If texture fails, keep a subtle grid as fallback
+        const grid = new THREE.GridHelper(mapWidth + 20, 46, 0x2d3847, 0x1a2432);
+        grid.position.y = -3.1;
+        scene.add(grid);
+      }
+    );
   }
 );
 
@@ -195,7 +311,10 @@ function animate() {
     }
     const pos = new THREE.Vector3().lerpVectors(p.a, p.b, p.t);
     p.mesh.position.copy(pos);
-    p.mesh.material.opacity = 1 - Math.abs(0.5 - p.t) * 2; // fade in/out
+    const o = 1 - Math.abs(0.5 - p.t) * 2; // fade in/out
+    p.mesh.material.opacity = 0.6 + 0.4 * o;
+    const s = 2.0 + 3.0 * (0.5 - Math.abs(0.5 - p.t));
+    p.mesh.scale.set(s, s, 1);
   }
 
   controls.update();
@@ -242,7 +361,10 @@ try {
       let i = Math.floor(Math.random() * nodes.length);
       let j = Math.floor(Math.random() * nodes.length);
       if (i === j) j = (j + 1) % nodes.length;
-      addPulse(nodes[i], nodes[j]);
+      // Color pulse by source continent color
+      const ccode = nodeGroup.children[i].userData.continent;
+      const col = CONTINENT_INFO[ccode]?.color ?? 0xffa34d;
+      addPulse(nodes[i], nodes[j], col);
 
       const now = performance.now();
       txCountWindow.push(now);
