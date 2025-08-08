@@ -345,6 +345,7 @@ function assetUrl(p) {
 // Prefer local assets under /public/maps, but only load if present to avoid console 404s
 (async () => {
   const candidate = await firstAvailable([
+    assetUrl('maps/world-blank.svg'),
     assetUrl('maps/world-dark-4096.jpg'),
     assetUrl('maps/world-dark-2048.jpg'),
     assetUrl('maps/world-dark-2048.png'),
