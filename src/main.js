@@ -760,6 +760,7 @@ function updateMining(now) {
 }
 
 function updateHeaderStats() {
+  if (!mining) return;
   if (elHdrHeight && mining.tipHeight) elHdrHeight.textContent = String(mining.tipHeight);
   if (elHdrSubsidy && mining.rewardBTC != null) elHdrSubsidy.textContent = `${fmt(mining.rewardBTC)} BTC`;
   if (mining.lastBlockTs) {
