@@ -45,6 +45,11 @@ Notes for geographic layout:
 - To add/adjust countries, edit `src/geo/countries.js` and `src/geo/sampleNodes.js`.
 - Backdrop images are generated from a canvas; replace with flag or map textures if desired.
 
+Map overlay & controls:
+- A semi-transparent equirectangular world map is rendered as a plane below nodes.
+- OrbitControls: left-drag orbit, right-drag pan, wheel zoom.
+- You can tweak pan/zoom speeds in `src/main.js` (look for `OrbitControls` settings).
+
 ## License
 
 MIT

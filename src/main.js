@@ -30,8 +30,12 @@ scene.add(dir);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
-controls.minDistance = 20;
-controls.maxDistance = 400;
+controls.enablePan = true;
+controls.panSpeed = 0.6;
+controls.zoomSpeed = 1.2;
+controls.rotateSpeed = 0.6;
+controls.minDistance = 5;
+controls.maxDistance = 800;
 
 // Geo-clustered node distribution
 const nodeData = generateSampleNodes();
@@ -141,10 +145,38 @@ function addPulse(a, b) {
   // optional: slight scale flicker
 }
 
-// Subtle grid to ground the map
-const grid = new THREE.GridHelper(460, 46, 0x2d3847, 0x1a2432);
-grid.position.y = -3;
-scene.add(grid);
+// World map overlay (equirectangular) aligned with our lat/lon projection
+// Plane size matches degrees scaled in sampleNodes (scale = 1.2)
+const MAP_SCALE = 1.2;
+const mapWidth = 360 * MAP_SCALE;
+const mapHeight = 180 * MAP_SCALE;
+const mapGeo = new THREE.PlaneGeometry(mapWidth, mapHeight, 1, 1);
+const mapMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 });
+const worldMap = new THREE.Mesh(mapGeo, mapMat);
+worldMap.position.set(0, -3, 0);
+worldMap.rotation.x = -Math.PI / 2; // lie on XZ
+worldMap.renderOrder = -1;
+scene.add(worldMap);
+
+// Load a lightweight world map texture (Wikimedia thumbnail, permissive hotlinking)
+const texLoader = new THREE.TextureLoader();
+texLoader.setCrossOrigin('anonymous');
+texLoader.load(
+  'https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/World_map_-_low_resolution.png/1024px-World_map_-_low_resolution.png',
+  (tex) => {
+    tex.anisotropy = 4;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    mapMat.map = tex;
+    mapMat.needsUpdate = true;
+  },
+  undefined,
+  () => {
+    // If texture fails, keep a subtle grid as fallback
+    const grid = new THREE.GridHelper(mapWidth + 20, 46, 0x2d3847, 0x1a2432);
+    grid.position.y = -3.1;
+    scene.add(grid);
+  }
+);
 
 // Animation loop
 function animate() {
