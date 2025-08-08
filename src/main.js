@@ -402,6 +402,9 @@ function animate() {
     p.mesh.scale.set(s, s, 1);
   }
 
+  // Mining updates
+  updateMining(performance.now());
+
   controls.update();
   composer.render();
 }
@@ -449,6 +452,14 @@ const elStats = document.getElementById('stats');
 const elLegend = document.getElementById('legend');
 const elNow = document.getElementById('metrics-now');
 const el5m = document.getElementById('metrics-5m');
+const elMiningUI = document.getElementById('mining-ui');
+const elTabNetwork = document.getElementById('tab-network');
+const elTabMining = document.getElementById('tab-mining');
+const elReward = document.getElementById('mining-reward');
+const elAttempts = document.getElementById('mining-attempts');
+const elElapsed = document.getElementById('mining-elapsed');
+const elProgress = document.getElementById('mining-progress');
+const elWinner = document.getElementById('mining-winner');
 let txCountWindow = [];
 let txCountWindow5m = [];
 let txByContMinute = new Map();
@@ -559,3 +570,181 @@ if (import.meta && import.meta.hot) {
     try { wsHandle?.close(); } catch {}
   });
 }
+
+// -----------------
+// Mining mode setup
+// -----------------
+const MINING_REWARD_BTC = 3.125;
+function fmt(n) { return Intl.NumberFormat('en-US', { maximumFractionDigits: 3 }).format(n); }
+
+const mining = {
+  active: false,
+  block: null,
+  miners: [],
+  attempts: 0,
+  target: 500 + Math.floor(Math.random() * 1500),
+  start: 0,
+  winnerIdx: -1,
+  sprites: [],
+  coin: null,
+};
+
+function makeBlockMesh() {
+  const geo = new THREE.BoxGeometry(14, 8, 14);
+  const mat = new THREE.MeshStandardMaterial({ color: 0x1e2a38, metalness: 0.1, roughness: 0.7, emissive: 0x0a0f14, emissiveIntensity: 0.4 });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(0, 8, 0);
+  mesh.castShadow = false;
+  mesh.receiveShadow = false;
+  return mesh;
+}
+
+function makeCoinTexture(text = `${MINING_REWARD_BTC} BTC`) {
+  const size = 256;
+  const c = document.createElement('canvas'); c.width = size; c.height = size;
+  const ctx = c.getContext('2d');
+  // coin circle
+  const grad = ctx.createRadialGradient(size/2, size/2, size*0.1, size/2, size/2, size*0.48);
+  grad.addColorStop(0, '#ffdf7f');
+  grad.addColorStop(1, '#c9971a');
+  ctx.fillStyle = grad;
+  ctx.beginPath(); ctx.arc(size/2, size/2, size*0.45, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 6; ctx.stroke();
+  // text
+  ctx.fillStyle = '#3b2c00';
+  ctx.font = 'bold 48px system-ui, sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, size/2, size/2);
+  const tex = new THREE.CanvasTexture(c);
+  tex.anisotropy = MAX_ANISO;
+  return tex;
+}
+
+function spawnAttempt(from, to) {
+  const size = 96;
+  const c = document.createElement('canvas'); c.width = size; c.height = size;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+  g.addColorStop(0.0, 'rgba(120,200,255,0.9)');
+  g.addColorStop(0.6, 'rgba(120,200,255,0.2)');
+  g.addColorStop(1.0, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(size/2, size/2, size/2, 0, Math.PI*2); ctx.fill();
+  const tex = new THREE.CanvasTexture(c);
+  const mat = new THREE.SpriteMaterial({ map: tex, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, opacity: 0.9 });
+  const sp = new THREE.Sprite(mat);
+  sp.position.copy(from);
+  sp.scale.set(2.4, 2.4, 1);
+  const speed = 0.025 + Math.random() * 0.03;
+  mining.sprites.push({ sp, a: from.clone(), b: to.clone(), t: 0, speed });
+  scene.add(sp);
+}
+
+function startMining() {
+  if (mining.active) return;
+  mining.active = true;
+  mining.attempts = 0;
+  mining.target = 500 + Math.floor(Math.random() * 1500);
+  mining.start = performance.now();
+  mining.winnerIdx = -1;
+  mining.coin && scene.remove(mining.coin);
+  mining.coin = null;
+  // choose subset of miners
+  mining.miners = [];
+  const sample = new Set();
+  while (sample.size < Math.min(24, nodeGroup.children.length)) {
+    sample.add(Math.floor(Math.random() * nodeGroup.children.length));
+  }
+  mining.miners = Array.from(sample);
+  // block mesh
+  mining.block = mining.block || makeBlockMesh();
+  scene.add(mining.block);
+  // UI
+  elReward && (elReward.textContent = `${fmt(MINING_REWARD_BTC)} BTC`);
+  elWinner && (elWinner.textContent = '—');
+}
+
+function stopMining() {
+  mining.active = false;
+  // cleanup sprites
+  for (const s of mining.sprites) scene.remove(s.sp);
+  mining.sprites = [];
+  if (mining.block) scene.remove(mining.block);
+}
+
+function updateMining(now) {
+  if (!mining.active) return;
+  // spin block
+  mining.block.rotation.y += 0.01;
+  // spawn attempts
+  if (mining.winnerIdx < 0) {
+    // bursty spawn
+    const bursts = 4;
+    for (let k = 0; k < bursts; k++) {
+      const idx = mining.miners[Math.floor(Math.random() * mining.miners.length)];
+      const from = nodeGroup.children[idx].position;
+      spawnAttempt(from, mining.block.position);
+      mining.attempts++;
+      if (mining.attempts >= mining.target) {
+        mining.winnerIdx = idx;
+        break;
+      }
+    }
+  }
+  // advance attempt sprites
+  for (let i = mining.sprites.length - 1; i >= 0; i--) {
+    const s = mining.sprites[i]; s.t += s.speed;
+    if (s.t >= 1) { scene.remove(s.sp); mining.sprites.splice(i, 1); continue; }
+    const pos = new THREE.Vector3().lerpVectors(s.a, s.b, s.t);
+    s.sp.position.copy(pos);
+    const o = 1 - Math.abs(0.5 - s.t) * 2; s.sp.material.opacity = 0.5 + 0.5 * o;
+  }
+  // progress & UI
+  const elapsed = Math.max(0, (now - mining.start) / 1000);
+  elAttempts && (elAttempts.textContent = mining.attempts.toString());
+  elElapsed && (elElapsed.textContent = `${elapsed.toFixed(1)}s`);
+  const pct = Math.min(100, Math.floor((mining.attempts / mining.target) * 100));
+  if (elProgress) elProgress.style.width = pct + '%';
+
+  // winner handling: spawn coin and fly to winner
+  if (mining.winnerIdx >= 0 && !mining.coin) {
+    const tex = makeCoinTexture(`${MINING_REWARD_BTC} BTC`);
+    const mat = new THREE.SpriteMaterial({ map: tex, transparent: true });
+    const coin = new THREE.Sprite(mat);
+    coin.scale.set(10, 10, 1);
+    coin.position.copy(mining.block.position).add(new THREE.Vector3(0, 6, 0));
+    mining.coin = coin;
+    scene.add(coin);
+    elWinner && (elWinner.textContent = `Miner @ node ${mining.winnerIdx}`);
+  }
+  if (mining.coin && mining.winnerIdx >= 0) {
+    const target = nodeGroup.children[mining.winnerIdx].position.clone().add(new THREE.Vector3(0, 4, 0));
+    const cur = mining.coin.position.clone();
+    const to = cur.lerp(target, 0.02);
+    mining.coin.position.copy(to);
+    mining.coin.material.opacity = 0.9;
+    // finish
+    if (to.distanceTo(target) < 0.8) {
+      // small pop
+      mining.coin.scale.multiplyScalar(1.02);
+      // restart new round after short delay
+      setTimeout(() => { stopMining(); startMining(); }, 1200);
+    }
+  }
+}
+
+// Tab switching
+function setModeMining(on) {
+  if (on) {
+    elTabMining?.classList.add('active'); elTabMining?.setAttribute('aria-pressed', 'true');
+    elTabNetwork?.classList.remove('active'); elTabNetwork?.setAttribute('aria-pressed', 'false');
+    elMiningUI?.classList.remove('hidden');
+    startMining();
+  } else {
+    elTabNetwork?.classList.add('active'); elTabNetwork?.setAttribute('aria-pressed', 'true');
+    elTabMining?.classList.remove('active'); elTabMining?.setAttribute('aria-pressed', 'false');
+    elMiningUI?.classList.add('hidden');
+    stopMining();
+  }
+}
+elTabNetwork?.addEventListener('click', () => setModeMining(false));
+elTabMining?.addEventListener('click', () => setModeMining(true));

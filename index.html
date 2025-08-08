@@ -21,6 +21,10 @@
               <span id="stats">TX/min: —</span>
             </div>
           </div>
+          <div class="tabs">
+            <button id="tab-network" class="tab active" aria-pressed="true">Network</button>
+            <button id="tab-mining" class="tab" aria-pressed="false">Block Mining</button>
+          </div>
           <p class="explain">
             Clusters show nodes grouped by country, colored by continent. Lines hint at peer links. Glowing pulses trace unconfirmed transactions flowing between random nodes.
           </p>
@@ -34,6 +38,24 @@
             <div class="col">
               <h3>Nodes by Continent</h3>
               <ul id="legend" class="legend"></ul>
+            </div>
+          </div>
+          <div id="mining-ui" class="mining hidden">
+            <p class="explain">Simulated miners attempt hashes to solve the current block. Winner receives the block subsidy.</p>
+            <div class="panel">
+              <div class="col">
+                <h3>Mining Status</h3>
+                <ul class="kv">
+                  <li><span>Subsidy</span><span id="mining-reward">—</span></li>
+                  <li><span>Attempts</span><span id="mining-attempts">—</span></li>
+                  <li><span>Elapsed</span><span id="mining-elapsed">—</span></li>
+                </ul>
+                <div class="progress"><div id="mining-progress" class="bar" style="width:0%"></div></div>
+              </div>
+              <div class="col">
+                <h3>Winner</h3>
+                <p id="mining-winner">—</p>
+              </div>
             </div>
           </div>
         </div>
