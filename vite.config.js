@@ -4,4 +4,7 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   // Set base for GitHub Pages deployment
   base: '/btc-network-visualisation/',
+  build: {
+    sourcemap: true,
+  },
 });

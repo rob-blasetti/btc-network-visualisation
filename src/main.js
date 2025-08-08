@@ -787,12 +787,14 @@ let stopTip;
 try {
   stopTip = subscribeTip({
     intervalMs: 15000,
-    onUpdate: ({ height, timestamp }) => {
-      mining.tipHeight = height;
-      mining.lastBlockTs = timestamp;
-      mining.rewardBTC = computeSubsidy(height);
+    onUpdate: (tip) => {
+      const h = tip?.height || 0;
+      const ts = tip?.timestamp || 0;
+      mining.tipHeight = h;
+      mining.lastBlockTs = ts;
+      mining.rewardBTC = computeSubsidy(h);
       if (elReward) elReward.textContent = `${fmt(mining.rewardBTC)} BTC`;
-      if (elHeight) elHeight.textContent = `${height}`;
+      if (elHeight) elHeight.textContent = `${h}`;
     },
   });
 } catch {}
