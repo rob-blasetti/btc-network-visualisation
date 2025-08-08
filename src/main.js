@@ -318,15 +318,14 @@ scene.add(worldMap);
 // Load a lightweight world map texture (Wikimedia thumbnail, permissive hotlinking)
 const texLoader = new THREE.TextureLoader();
 texLoader.setCrossOrigin('anonymous');
-function tryLoadInOrder(urls, onSuccess, onFail) {
-  if (!urls.length) { onFail?.(); return; }
-  const [head, ...rest] = urls;
-  texLoader.load(
-    head,
-    (tex) => onSuccess(tex),
-    undefined,
-    () => tryLoadInOrder(rest, onSuccess, onFail)
-  );
+async function firstAvailable(urls) {
+  for (const u of urls) {
+    try {
+      const res = await fetch(u, { method: 'HEAD' });
+      if (res.ok) return u;
+    } catch {}
+  }
+  return null;
 }
 
 // Resolve public/ assets respecting Vite base path
@@ -335,25 +334,26 @@ function assetUrl(p) {
   return `${base}${p.replace(/^\/+/, '')}`;
 }
 
-// Prefer local assets under /public/maps, fallback to remote
-tryLoadInOrder(
-  [
+// Prefer local assets under /public/maps, but only load if present to avoid console 404s
+(async () => {
+  const candidate = await firstAvailable([
     assetUrl('maps/world-dark-4096.jpg'),
     assetUrl('maps/world-dark-2048.jpg'),
-    assetUrl('maps/world-dark-2048.png')
-  ],
-  (tex) => {
-    tex.anisotropy = MAX_ANISO;
-    tex.colorSpace = THREE.SRGBColorSpace;
-    mapMat.map = tex;
-    mapMat.needsUpdate = true;
-  },
-  () => {
+    assetUrl('maps/world-dark-2048.png'),
+  ]);
+  if (candidate) {
+    texLoader.load(candidate, (tex) => {
+      tex.anisotropy = MAX_ANISO;
+      tex.colorSpace = THREE.SRGBColorSpace;
+      mapMat.map = tex;
+      mapMat.needsUpdate = true;
+    });
+  } else {
     const grid = new THREE.GridHelper(mapWidth + 20, 46, 0x2d3847, 0x1a2432);
     grid.position.y = -3.1;
     scene.add(grid);
   }
-);
+})();
 
 // Procedural graticule (lat/lon lines) for realism
 (function addGraticule() {
@@ -395,20 +395,21 @@ boundaryPlane.rotation.x = -Math.PI / 2;
 boundaryPlane.renderOrder = -0.5;
 scene.add(boundaryPlane);
 
-tryLoadInOrder(
-  [
+(async () => {
+  const candidate = await firstAvailable([
     assetUrl('maps/world-admin0-boundaries-4096.png'),
     assetUrl('maps/world-admin0-boundaries-2048.png'),
-    assetUrl('maps/world-coastlines-2048.png')
-  ],
-  (tex) => {
-    tex.anisotropy = MAX_ANISO;
-    tex.colorSpace = THREE.SRGBColorSpace;
-    boundaryMat.map = tex;
-    boundaryMat.needsUpdate = true;
-  },
-  () => { /* silently skip if not present */ }
-);
+    assetUrl('maps/world-coastlines-2048.png'),
+  ]);
+  if (candidate) {
+    texLoader.load(candidate, (tex) => {
+      tex.anisotropy = MAX_ANISO;
+      tex.colorSpace = THREE.SRGBColorSpace;
+      boundaryMat.map = tex;
+      boundaryMat.needsUpdate = true;
+    });
+  }
+})();
 
 // Animation loop
 function animate() {
