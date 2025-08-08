@@ -318,9 +318,9 @@ const mapHeight = 180 * MAP_SCALE;
 const mapGeo = new THREE.PlaneGeometry(mapWidth, mapHeight, 1, 1);
 const mapMat = new THREE.MeshBasicMaterial({ color: 0x8898a6, transparent: true, opacity: 0.35, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
 const worldMap = new THREE.Mesh(mapGeo, mapMat);
-worldMap.position.set(0, -5, 0);
+worldMap.position.set(0, -5.0, 0);
 worldMap.rotation.x = -Math.PI / 2; // lie on XZ
-worldMap.renderOrder = -1;
+worldMap.renderOrder = -0.9; // above base grid
 scene.add(worldMap);
 
 // Load a lightweight world map texture (Wikimedia thumbnail, permissive hotlinking)
@@ -348,6 +348,8 @@ function assetUrl(p) {
     assetUrl('maps/world-dark-4096.jpg'),
     assetUrl('maps/world-dark-2048.jpg'),
     assetUrl('maps/world-dark-2048.png'),
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/2/29/BlankMap-World-v2-dark-gray.svg/2000px-BlankMap-World-v2-dark-gray.svg.png',
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/2/29/BlankMap-World-v2-dark-gray.svg/1024px-BlankMap-World-v2-dark-gray.svg.png'
   ]);
   if (candidate) {
     texLoader.load(candidate, (tex) => {
@@ -357,9 +359,7 @@ function assetUrl(p) {
       mapMat.needsUpdate = true;
     });
   } else {
-    const grid = new THREE.GridHelper(mapWidth + 20, 46, 0x2d3847, 0x1a2432);
-    grid.position.y = -3.1;
-    scene.add(grid);
+    // no-op; base grid always present below
   }
 })();
 
@@ -408,6 +408,7 @@ scene.add(boundaryPlane);
     assetUrl('maps/world-admin0-boundaries-4096.png'),
     assetUrl('maps/world-admin0-boundaries-2048.png'),
     assetUrl('maps/world-coastlines-2048.png'),
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4a/BlankMap-World_White.svg/2048px-BlankMap-World_White.svg.png'
   ]);
   if (candidate) {
     texLoader.load(candidate, (tex) => {
@@ -418,6 +419,11 @@ scene.add(boundaryPlane);
     });
   }
 })();
+
+// Always add a subtle base grid underneath the world map for structure
+const baseGrid = new THREE.GridHelper(mapWidth + 60, 72, 0x273241, 0x1a2432);
+baseGrid.position.y = -5.3; // slightly under the map
+scene.add(baseGrid);
 
 // Animation loop
 function animate() {
@@ -482,6 +488,67 @@ if (hudEl && hudToggle) {
   hudToggle.addEventListener('click', () => {
     const isColl = hudEl.classList.contains('collapsed');
     setCollapsed(!isColl);
+  });
+}
+
+// Draggable + resizable HUD
+if (hudEl) {
+  const storeKey = 'hudPosV1';
+  function clamp(val, min, max) { return Math.max(min, Math.min(max, val)); }
+  function applyPos(pos) {
+    hudEl.style.left = pos.x + 'px';
+    hudEl.style.top = pos.y + 'px';
+    if (pos.w) hudEl.style.width = pos.w + 'px';
+  }
+  const def = { x: 12, y: 12, w: Math.min(440, window.innerWidth - 24) };
+  let pos;
+  try { pos = JSON.parse(localStorage.getItem(storeKey) || 'null') || def; } catch { pos = def; }
+  pos.x = clamp(pos.x, 8, Math.max(8, window.innerWidth - 120));
+  pos.y = clamp(pos.y, 8, Math.max(8, window.innerHeight - 80));
+  pos.w = clamp(pos.w || def.w, 260, Math.min(900, window.innerWidth - 24));
+  applyPos(pos);
+
+  function save() { try { localStorage.setItem(storeKey, JSON.stringify(pos)); } catch {} }
+
+  // Dragging
+  const header = hudEl.querySelector('.hud-header');
+  let dragging = false; let dx = 0; let dy = 0;
+  header?.addEventListener('pointerdown', (e) => {
+    dragging = true;
+    hudEl.classList.add('dragging');
+    dx = e.clientX - pos.x; dy = e.clientY - pos.y;
+    header.setPointerCapture(e.pointerId);
+  });
+  header?.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    pos.x = clamp(e.clientX - dx, 8, window.innerWidth - 120);
+    pos.y = clamp(e.clientY - dy, 8, window.innerHeight - 80);
+    applyPos(pos);
+  });
+  header?.addEventListener('pointerup', (e) => {
+    if (!dragging) return;
+    dragging = false; hudEl.classList.remove('dragging'); header.releasePointerCapture(e.pointerId); save();
+  });
+
+  // Resizing
+  const resizer = hudEl.querySelector('.hud-resizer');
+  let resizing = false; let sx = 0; let sw = 0;
+  resizer?.addEventListener('pointerdown', (e) => {
+    resizing = true; sx = e.clientX; sw = pos.w; resizer.setPointerCapture(e.pointerId);
+  });
+  resizer?.addEventListener('pointermove', (e) => {
+    if (!resizing) return;
+    const dw = e.clientX - sx;
+    pos.w = clamp(sw + dw, 260, Math.min(900, window.innerWidth - pos.x - 12));
+    applyPos(pos);
+  });
+  resizer?.addEventListener('pointerup', (e) => { if (!resizing) return; resizing = false; resizer.releasePointerCapture(e.pointerId); save(); });
+
+  window.addEventListener('resize', () => {
+    pos.x = clamp(pos.x, 8, window.innerWidth - 120);
+    pos.y = clamp(pos.y, 8, window.innerHeight - 80);
+    pos.w = clamp(pos.w, 260, Math.min(900, window.innerWidth - pos.x - 12));
+    applyPos(pos); save();
   });
 }
 

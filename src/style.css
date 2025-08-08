@@ -50,9 +50,18 @@ body {
   padding: 12px 14px;
   box-shadow: 0 8px 30px rgba(0,0,0,0.35);
   backdrop-filter: blur(6px);
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  width: 440px;
+  max-width: calc(100vw - 24px);
+  z-index: 5;
 }
 .hud * { pointer-events: auto; }
 .hud-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+#overlay .hud.dragging { cursor: move; user-select: none; }
+.hud-resizer { position: absolute; width: 14px; height: 14px; right: 6px; bottom: 6px; border-radius: 4px; background: rgba(255,255,255,0.15); cursor: nwse-resize; }
+.hud-resizer:after { content: ''; position: absolute; right: 3px; bottom: 3px; width: 8px; height: 8px; border-right: 2px solid rgba(0,0,0,0.4); border-bottom: 2px solid rgba(0,0,0,0.4); }
 #overlay h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: 0.2px; }
 .explain { margin: 8px 0 12px 0; opacity: 0.9; font-size: 13px; color: var(--muted); }
 #overlay .hdr-stats { display: flex; gap: 10px; align-items: center; opacity: 0.9; font-size: 12px; }
