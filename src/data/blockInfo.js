@@ -25,11 +25,31 @@ export async function fetchTipFromBlockstream() {
   return { height, timestamp: ts };
 }
 
+export async function fetchTipFromBlockCypher() {
+  const res = await fetch('https://api.blockcypher.com/v1/btc/main');
+  if (!res.ok) throw new Error('blockcypher failed');
+  const j = await res.json();
+  const height = j.height;
+  const ts = j.time ? Date.parse(j.time) : Date.now();
+  if (!Number.isFinite(height)) throw new Error('blockcypher invalid');
+  return { height, timestamp: ts };
+}
+
+export async function fetchTipFromBlockchainInfo() {
+  const res = await fetch('https://blockchain.info/q/getblockcount');
+  if (!res.ok) throw new Error('blockchain.info failed');
+  const text = await res.text();
+  const height = parseInt(text, 10);
+  if (!Number.isFinite(height)) throw new Error('blockchain.info invalid');
+  // timestamp unknown here; leave undefined so UI just shows height
+  return { height, timestamp: 0 };
+}
+
 export async function getTip() {
-  try { return await fetchTipFromMempool(); }
-  catch { /* noop */ }
-  try { return await fetchTipFromBlockstream(); }
-  catch { /* noop */ }
+  try { return await fetchTipFromMempool(); } catch {}
+  try { return await fetchTipFromBlockstream(); } catch {}
+  try { return await fetchTipFromBlockCypher(); } catch {}
+  try { return await fetchTipFromBlockchainInfo(); } catch {}
   throw new Error('All tip sources failed');
 }
 
@@ -57,4 +77,3 @@ export function subscribeTip({ intervalMs = 15000, onUpdate } = {}) {
   tick();
   return () => { stopped = true; if (timer) clearTimeout(timer); };
 }
-

@@ -40,11 +40,12 @@ jobs:
           # Dark basemap candidates (public-domain/CC BY-SA sources)
           fetch_into public/maps/world-dark-2048.jpg \
             "https://upload.wikimedia.org/wikipedia/commons/8/80/World_map_-_low_resolution.png" \
-            "https://upload.wikimedia.org/wikipedia/commons/2/21/World_map_with_four_colours.svg" # fallback SVG as raster may fail
+            "https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/World_map_-_low_resolution.png/2048px-World_map_-_low_resolution.png" \
+            "https://upload.wikimedia.org/wikipedia/commons/thumb/2/29/BlankMap-World-v2-dark-gray.svg/2048px-BlankMap-World-v2-dark-gray.svg.png"
           # Boundaries overlay (transparent) candidates
           fetch_into public/maps/world-admin0-boundaries-2048.png \
-            "https://upload.wikimedia.org/wikipedia/commons/4/4a/BlankMap-World_White.svg" \
-            "https://upload.wikimedia.org/wikipedia/commons/8/80/World_map_-_low_resolution.png"
+            "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4a/BlankMap-World_White.svg/2048px-BlankMap-World_White.svg.png" \
+            "https://upload.wikimedia.org/wikipedia/commons/4/4a/BlankMap-World_White.svg"
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
