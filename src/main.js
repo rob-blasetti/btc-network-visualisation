@@ -1,5 +1,9 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
+import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js';
 import { connectUnconfirmedTxs } from './data/blockchainInfoWS.js';
 import { generateSampleNodes, computeCountryBackdrops } from './geo/sampleNodes.js';
 import { COUNTRIES } from './geo/countries.js';
@@ -11,12 +15,14 @@ const canvas = document.getElementById('scene');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+const MAX_ANISO = renderer.capabilities.getMaxAnisotropy?.() || 4;
 
 // Scene & camera
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x070b14);
 
-const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 5000);
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 2000);
 camera.position.set(0, 140, 420);
 scene.add(camera);
 
@@ -42,7 +48,7 @@ controls.maxDistance = 800;
 const nodeData = generateSampleNodes();
 const nodes = [];
 
-const nodeGeom = new THREE.SphereGeometry(1.25, 20, 20);
+const nodeGeom = new THREE.SphereGeometry(1.25, 24, 24);
 const nodeGroup = new THREE.Group();
 
 for (const n of nodeData) {
@@ -82,7 +88,9 @@ function makeBackdropTexture(code, sizePx = 256) {
   ctx.font = `${Math.floor(sizePx * 0.10)}px sans-serif`;
   ctx.fillText(name, sizePx / 2, sizePx * 0.7);
   const tex = new THREE.CanvasTexture(c);
-  tex.anisotropy = 4;
+  tex.anisotropy = MAX_ANISO;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
   tex.needsUpdate = true;
   return tex;
 }
@@ -129,7 +137,9 @@ function makeLabelSprite(text, color = '#ffffff') {
   ctx.shadowBlur = 8;
   ctx.fillText(text, size/2, size/2);
   const tex = new THREE.CanvasTexture(c);
-  tex.anisotropy = 4;
+  tex.anisotropy = MAX_ANISO;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
   const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
   const sp = new THREE.Sprite(mat);
   sp.scale.set(28, 14, 1);
@@ -207,10 +217,20 @@ const edgeMat = new THREE.LineBasicMaterial({ color: 0x6b8aa8, transparent: true
 const edges = new THREE.LineSegments(edgeGeom, edgeMat);
 scene.add(edges);
 // Add a soft additive glow for edges
-const edgeGlowMat = new THREE.LineBasicMaterial({ color: 0x98b7d6, transparent: true, opacity: 0.15, blending: THREE.AdditiveBlending, depthWrite: false });
+const edgeGlowMat = new THREE.LineBasicMaterial({ color: 0x98b7d6, transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending, depthWrite: false });
 const edgesGlow = new THREE.LineSegments(edgeGeom.clone(), edgeGlowMat);
 edgesGlow.position.y = 0.01;
 scene.add(edgesGlow);
+
+// Postprocessing: FXAA to reduce shimmering on thin lines
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const fxaaPass = new ShaderPass(FXAAShader);
+{
+  const pr = renderer.getPixelRatio();
+  fxaaPass.material.uniforms['resolution'].value.set(1 / (window.innerWidth * pr), 1 / (window.innerHeight * pr));
+}
+composer.addPass(fxaaPass);
 
 // Pulses for live transactions (additive glowing sprites)
 const pulses = [];
@@ -230,14 +250,16 @@ function getPulseTexture() {
   ctx.arc(size/2, size/2, size/2, 0, Math.PI*2);
   ctx.fill();
   pulseTexture = new THREE.CanvasTexture(c);
-  pulseTexture.anisotropy = 4;
+  pulseTexture.anisotropy = MAX_ANISO;
+  pulseTexture.minFilter = THREE.LinearMipmapLinearFilter;
+  pulseTexture.magFilter = THREE.LinearFilter;
   pulseTexture.needsUpdate = true;
   return pulseTexture;
 }
 
 function addPulse(a, b, color = 0xffa34d) {
   const tex = getPulseTexture();
-  const mat = new THREE.SpriteMaterial({ map: tex, color, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, opacity: 0.9 });
+  const mat = new THREE.SpriteMaterial({ map: tex, color, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, depthTest: false, opacity: 0.9 });
   const sprite = new THREE.Sprite(mat);
   sprite.position.copy(a);
   sprite.scale.set(2.6, 2.6, 1);
@@ -252,9 +274,9 @@ const MAP_SCALE = 1.2;
 const mapWidth = 360 * MAP_SCALE;
 const mapHeight = 180 * MAP_SCALE;
 const mapGeo = new THREE.PlaneGeometry(mapWidth, mapHeight, 1, 1);
-const mapMat = new THREE.MeshBasicMaterial({ color: 0x8898a6, transparent: true, opacity: 0.35 });
+const mapMat = new THREE.MeshBasicMaterial({ color: 0x8898a6, transparent: true, opacity: 0.35, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
 const worldMap = new THREE.Mesh(mapGeo, mapMat);
-worldMap.position.set(0, -3, 0);
+worldMap.position.set(0, -5, 0);
 worldMap.rotation.x = -Math.PI / 2; // lie on XZ
 worldMap.renderOrder = -1;
 scene.add(worldMap);
@@ -283,7 +305,7 @@ tryLoadInOrder(
     'https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/World_map_-_low_resolution.png/1024px-World_map_-_low_resolution.png'
   ],
   (tex) => {
-    tex.anisotropy = 4;
+    tex.anisotropy = MAX_ANISO;
     tex.colorSpace = THREE.SRGBColorSpace;
     mapMat.map = tex;
     mapMat.needsUpdate = true;
@@ -316,19 +338,21 @@ tryLoadInOrder(
     ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(size, y); ctx.stroke();
   }
   const tex = new THREE.CanvasTexture(c);
-  tex.anisotropy = 4;
+  tex.anisotropy = MAX_ANISO;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
   const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false });
   const grid = new THREE.Mesh(mapGeo.clone(), mat);
-  grid.position.set(0, -2.98, 0);
+  grid.position.set(0, -4.6, 0);
   grid.rotation.x = -Math.PI / 2;
   grid.renderOrder = -0.25;
   scene.add(grid);
 })();
 
 // Optional boundaries overlay plane if local asset exists (loaded opportunistically)
-const boundaryMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.35, depthWrite: false });
+const boundaryMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.35, depthWrite: false, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
 const boundaryPlane = new THREE.Mesh(mapGeo.clone(), boundaryMat);
-boundaryPlane.position.set(0, -2.99, 0);
+boundaryPlane.position.set(0, -4.8, 0);
 boundaryPlane.rotation.x = -Math.PI / 2;
 boundaryPlane.renderOrder = -0.5;
 scene.add(boundaryPlane);
@@ -340,7 +364,7 @@ tryLoadInOrder(
     '/maps/world-coastlines-2048.png'
   ],
   (tex) => {
-    tex.anisotropy = 4;
+    tex.anisotropy = MAX_ANISO;
     tex.colorSpace = THREE.SRGBColorSpace;
     boundaryMat.map = tex;
     boundaryMat.needsUpdate = true;
@@ -372,7 +396,7 @@ function animate() {
   }
 
   controls.update();
-  renderer.render(scene, camera);
+  composer.render();
 }
 animate();
 
@@ -382,6 +406,10 @@ window.addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  composer.setSize(window.innerWidth, window.innerHeight);
+  // update FXAA resolution (1 / pixel)
+  const pr = renderer.getPixelRatio();
+  fxaaPass.material.uniforms['resolution'].value.set(1 / (window.innerWidth * pr), 1 / (window.innerHeight * pr));
 });
 
 // TODO: Replace mock graph with live Bitcoin network data.
