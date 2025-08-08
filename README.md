@@ -1,5 +1,7 @@
 # BTC Network Visualizer (Three.js)
 
+Live demo: https://rob-blasetti.github.io/btc-network-visualisation/
+
 Interactive prototype that visualizes a Bitcoin-like peer graph using Three.js. It ships with a placeholder graph and is ready to be wired to live data sources (e.g., mempool.space websockets, Bitcoin Core ZMQ, or public APIs).
 
 ## Scripts
@@ -16,9 +18,9 @@ Interactive prototype that visualizes a Bitcoin-like peer graph using Three.js. 
 
 ## Deployment (GitHub Pages)
 
-This repo includes a workflow that builds and publishes `dist` to GitHub Pages on every push to `main`. The Vite `base` is set to `/btc-network-visualizer-threejs/`.
+This repo includes a workflow that builds and publishes `dist` to GitHub Pages on every push to `main`. The Vite `base` is set to `/btc-network-visualisation/`.
 
-If you rename the repo, update `vite.config.js` accordingly.
+If you fork or rename the repo, update `base` in `vite.config.js` accordingly.
 
 ## Roadmap
 
@@ -30,4 +32,3 @@ If you rename the repo, update `vite.config.js` accordingly.
 ## License
 
 MIT
-
