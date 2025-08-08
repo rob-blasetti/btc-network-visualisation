@@ -262,36 +262,60 @@ scene.add(worldMap);
 // Load a lightweight world map texture (Wikimedia thumbnail, permissive hotlinking)
 const texLoader = new THREE.TextureLoader();
 texLoader.setCrossOrigin('anonymous');
-texLoader.load(
-  'https://upload.wikimedia.org/wikipedia/commons/thumb/2/29/BlankMap-World-v2-dark-gray.svg/1024px-BlankMap-World-v2-dark-gray.svg.png',
+function tryLoadInOrder(urls, onSuccess, onFail) {
+  if (!urls.length) { onFail?.(); return; }
+  const [head, ...rest] = urls;
+  texLoader.load(
+    head,
+    (tex) => onSuccess(tex),
+    undefined,
+    () => tryLoadInOrder(rest, onSuccess, onFail)
+  );
+}
+
+// Prefer local assets under /public/maps, fallback to remote
+tryLoadInOrder(
+  [
+    '/maps/world-dark-4096.jpg',
+    '/maps/world-dark-2048.jpg',
+    '/maps/world-dark-2048.png',
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/2/29/BlankMap-World-v2-dark-gray.svg/1024px-BlankMap-World-v2-dark-gray.svg.png',
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/World_map_-_low_resolution.png/1024px-World_map_-_low_resolution.png'
+  ],
   (tex) => {
     tex.anisotropy = 4;
     tex.colorSpace = THREE.SRGBColorSpace;
     mapMat.map = tex;
     mapMat.needsUpdate = true;
   },
-  undefined,
   () => {
-    // Fallback to lighter map and tint darker
-    texLoader.load(
-      'https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/World_map_-_low_resolution.png/1024px-World_map_-_low_resolution.png',
-      (tex2) => {
-        tex2.anisotropy = 4;
-        tex2.colorSpace = THREE.SRGBColorSpace;
-        mapMat.map = tex2;
-        mapMat.color.setHex(0x708090);
-        mapMat.opacity = 0.4;
-        mapMat.needsUpdate = true;
-      },
-      undefined,
-      () => {
-        // If texture fails, keep a subtle grid as fallback
-        const grid = new THREE.GridHelper(mapWidth + 20, 46, 0x2d3847, 0x1a2432);
-        grid.position.y = -3.1;
-        scene.add(grid);
-      }
-    );
+    const grid = new THREE.GridHelper(mapWidth + 20, 46, 0x2d3847, 0x1a2432);
+    grid.position.y = -3.1;
+    scene.add(grid);
   }
+);
+
+// Optional boundaries overlay plane if local asset exists (loaded opportunistically)
+const boundaryMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.35, depthWrite: false });
+const boundaryPlane = new THREE.Mesh(mapGeo.clone(), boundaryMat);
+boundaryPlane.position.set(0, -2.99, 0);
+boundaryPlane.rotation.x = -Math.PI / 2;
+boundaryPlane.renderOrder = -0.5;
+scene.add(boundaryPlane);
+
+tryLoadInOrder(
+  [
+    '/maps/world-admin0-boundaries-4096.png',
+    '/maps/world-admin0-boundaries-2048.png',
+    '/maps/world-coastlines-2048.png'
+  ],
+  (tex) => {
+    tex.anisotropy = 4;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    boundaryMat.map = tex;
+    boundaryMat.needsUpdate = true;
+  },
+  () => { /* silently skip if not present */ }
 );
 
 // Animation loop

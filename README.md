@@ -55,6 +55,11 @@ Continents & visibility:
 - Semi-transparent continent outlines and labels group regional clusters.
 - Edges have a subtle additive glow; pulses now use additive sprites for clearer flow.
 
+Map images (optional, recommended):
+- Add higher-quality map textures to `public/maps/` to make the scene more map-like.
+- Supported filenames and sources are documented in `public/maps/README.txt`.
+- If none are present, the app falls back to a remote, lightweight basemap.
+
 ## License
 
 MIT
