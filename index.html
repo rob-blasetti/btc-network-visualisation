@@ -46,6 +46,22 @@
               <ul id="legend" class="legend"></ul>
             </div>
           </div>
+          <div class="panel">
+            <div class="col">
+              <h3>Legend</h3>
+              <ul id="legend-visual" class="legend"></ul>
+            </div>
+            <div class="col">
+              <h3>Data Sources</h3>
+              <ul class="kv sources">
+                <li><span>Tx WS: Blockchain.info</span><span><label><input id="src-tx-bi" type="checkbox" checked> enable</label></span></li>
+                <li><span>Tx WS: mempool.space</span><span><label><input id="src-tx-mp" type="checkbox" checked> enable</label></span></li>
+                <li><span>Blocks WS: mempool.space</span><span><label><input id="src-block-mp" type="checkbox" checked> enable</label></span></li>
+                <li><span>Tip Poller</span><span><label><input id="src-tip" type="checkbox" checked> enable</label></span></li>
+              </ul>
+              <p class="muted small" id="sources-status"></p>
+            </div>
+          </div>
           <div id="mining-ui" class="mining hidden">
             <p class="explain">Simulated miners attempt hashes to solve the current block. Winner receives the block subsidy.</p>
             <div class="panel">

@@ -55,6 +55,7 @@ controls.maxDistance = 800;
 const elConn = document.getElementById('conn');
 const elStats = document.getElementById('stats');
 const elLegend = document.getElementById('legend');
+const elLegendVisual = document.getElementById('legend-visual');
 const elNow = document.getElementById('metrics-now');
 const el5m = document.getElementById('metrics-5m');
 const elMiningUI = document.getElementById('mining-ui');
@@ -73,6 +74,12 @@ var elHdrHeight = document.getElementById('hdr-height');
 var elHdrSince = document.getElementById('hdr-since');
 var elHdrEta = document.getElementById('hdr-eta');
 var elHdrSubsidy = document.getElementById('hdr-subsidy');
+// Sources toggles
+const cbTxBI = document.getElementById('src-tx-bi');
+const cbTxMP = document.getElementById('src-tx-mp');
+const cbBlkMP = document.getElementById('src-block-mp');
+const cbTip = document.getElementById('src-tip');
+const elSourcesStatus = document.getElementById('sources-status');
 
 // Mining state placeholder to avoid TDZ if referenced before initialization
 var mining = null;
@@ -547,6 +554,7 @@ try {
       elConn.classList.add('ok');
     },
     onTx: () => {
+      if (!enableTxBI) return;
       // Choose two random nodes to animate between
       if (nodes.length < 2) return;
       let i = Math.floor(Math.random() * nodes.length);
@@ -597,6 +605,7 @@ try {
       elConn.classList.add('ok');
     },
     onBlock: ({ height, timestamp }) => {
+      if (!enableBlkMP) return;
       // Update mining tip instantly when blocks arrive
       if (!mining) return;
       mining.tipHeight = height || mining.tipHeight;
@@ -608,6 +617,7 @@ try {
       }
     },
     onTx: () => {
+      if (!enableTxMP) return;
       // To avoid overloading pulses, sample mempool txs at ~20%
       if (Math.random() > 0.2 || nodes.length < 2) return;
       let i = Math.floor(Math.random() * nodes.length);
@@ -845,3 +855,79 @@ try {
     },
   });
 } catch {}
+// Render legend of visuals
+function renderVisualLegend() {
+  if (!elLegendVisual) return;
+  const entries = [
+    { label: 'Node (colored by continent)', sw: '#f7931a' },
+    { label: 'Edge (peer link)', sw: '#6b8aa8' },
+    { label: 'Edge glow (activity)', sw: '#98b7d6' },
+    { label: 'Tx pulse (moving, additive)', sw: '#ffa34d' },
+    { label: 'Country tile (code/name)', sw: '#3a4c63' },
+    { label: 'Continent outline', sw: '#888' },
+    { label: 'World basemap (optional)', sw: '#708090' },
+    { label: 'Block (mining tab)', sw: '#1e2a38' },
+    { label: 'Reward coin (subsidy)', sw: '#ffdf7f' },
+  ];
+  elLegendVisual.innerHTML = '';
+  for (const e of entries) {
+    const li = document.createElement('li');
+    const sw = document.createElement('span'); sw.className = 'swatch'; sw.style.background = e.sw;
+    const label = document.createElement('span'); label.textContent = e.label;
+    li.appendChild(sw); li.appendChild(label);
+    elLegendVisual.appendChild(li);
+  }
+}
+renderVisualLegend();
+
+// Data source toggles and status
+let enableTxBI = true;
+let enableTxMP = true;
+let enableBlkMP = true;
+let enableTipPoller = true;
+
+function updateSourcesStatus() {
+  const parts = [];
+  parts.push(`Tx BI: ${enableTxBI ? 'on' : 'off'}`);
+  parts.push(`Tx MP: ${enableTxMP ? 'on' : 'off'}`);
+  parts.push(`Blk MP: ${enableBlkMP ? 'on' : 'off'}`);
+  parts.push(`Tip: ${enableTipPoller ? 'on' : 'off'}`);
+  if (elSourcesStatus) elSourcesStatus.textContent = parts.join('  ·  ');
+  // Connection label
+  const active = [enableTxBI && wsHandle, enableTxMP && wsMempool].filter(Boolean).length;
+  if (elConn) {
+    elConn.textContent = active > 0 ? `Live: connected (${active})` : 'Live: disabled';
+    elConn.classList.toggle('ok', active > 0);
+    elConn.classList.toggle('err', active === 0);
+  }
+}
+
+cbTxBI?.addEventListener('change', (e) => { enableTxBI = !!e.target.checked; updateSourcesStatus(); });
+cbTxMP?.addEventListener('change', (e) => { enableTxMP = !!e.target.checked; updateSourcesStatus(); });
+cbBlkMP?.addEventListener('change', (e) => { enableBlkMP = !!e.target.checked; updateSourcesStatus(); });
+cbTip?.addEventListener('change', (e) => {
+  const on = !!e.target.checked; enableTipPoller = on;
+  if (on && !stopTip) {
+    // re-subscribe
+    try {
+      stopTip = subscribeTip({
+        intervalMs: 15000,
+        onUpdate: (tip) => {
+          const h = tip?.height || 0; const ts = tip?.timestamp || 0;
+          if (mining) {
+            mining.tipHeight = h || mining.tipHeight;
+            mining.lastBlockTs = ts || mining.lastBlockTs;
+            mining.rewardBTC = computeSubsidy(h || mining.tipHeight || 0);
+            if (elReward) elReward.textContent = `${fmt(mining.rewardBTC)} BTC`;
+            if (elHeight) elHeight.textContent = `${h}`;
+          }
+        },
+      });
+    } catch {}
+  } else if (!on && stopTip) {
+    try { stopTip(); } catch {};
+    stopTip = undefined;
+  }
+  updateSourcesStatus();
+});
+updateSourcesStatus();
