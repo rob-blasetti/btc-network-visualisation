@@ -6,5 +6,6 @@ export default defineConfig({
   base: '/btc-network-visualisation/',
   build: {
     sourcemap: true,
+    minify: false,
   },
 });
