@@ -1,0 +1,52 @@
+:root {
+  --bg: #0b0f1a;
+  --fg: #e6edf3;
+  --muted: #93a2b6;
+  --accent: #f7931a; /* Bitcoin orange */
+}
+
+* { box-sizing: border-box; }
+html, body, #app { height: 100%; }
+body {
+  margin: 0;
+  background: radial-gradient(1200px 800px at 70% -20%, #14203b 0%, var(--bg) 60%);
+  color: var(--fg);
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+#app {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+#scene {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+#overlay {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  background: linear-gradient(180deg, rgba(11, 15, 26, 0.72), rgba(11, 15, 26, 0.32));
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 10px 12px;
+  backdrop-filter: blur(6px);
+}
+
+#overlay h1 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+#overlay p {
+  margin: 4px 0 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
