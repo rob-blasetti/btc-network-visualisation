@@ -12,11 +12,29 @@
     <div id="app">
       <canvas id="scene"></canvas>
       <div id="overlay">
-        <h1>Bitcoin Network</h1>
-        <p>Live tx pulses via Blockchain.info WS</p>
-        <div id="status">
-          <span id="conn">Connecting…</span>
-          <span id="stats">TX/min: —</span>
+        <div class="hud">
+          <div class="hud-header">
+            <h1>Bitcoin Network</h1>
+            <div id="status">
+              <span id="conn">Connecting…</span>
+              <span id="stats">TX/min: —</span>
+            </div>
+          </div>
+          <p class="explain">
+            Clusters show nodes grouped by country, colored by continent. Lines hint at peer links. Glowing pulses trace unconfirmed transactions flowing between random nodes.
+          </p>
+          <div class="panel">
+            <div class="col">
+              <h3>Now</h3>
+              <ul id="metrics-now" class="kv"></ul>
+              <h3>Last 5 min</h3>
+              <ul id="metrics-5m" class="kv"></ul>
+            </div>
+            <div class="col">
+              <h3>Nodes by Continent</h3>
+              <ul id="legend" class="legend"></ul>
+            </div>
+          </div>
         </div>
       </div>
     </div>

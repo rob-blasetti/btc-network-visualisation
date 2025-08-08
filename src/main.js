@@ -295,6 +295,36 @@ tryLoadInOrder(
   }
 );
 
+// Procedural graticule (lat/lon lines) for realism
+(function addGraticule() {
+  const size = 2048;
+  const c = document.createElement('canvas');
+  c.width = size; c.height = size;
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0,0,size,size);
+  ctx.strokeStyle = 'rgba(180,200,220,0.12)';
+  ctx.lineWidth = 1;
+  // every 10 degrees with stronger every 30
+  for (let lon = -180; lon <= 180; lon += 10) {
+    const x = ((lon + 180) / 360) * size + 0.5;
+    ctx.globalAlpha = (lon % 30 === 0) ? 0.35 : 0.18;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, size); ctx.stroke();
+  }
+  for (let lat = -90; lat <= 90; lat += 10) {
+    const y = ((90 - lat) / 180) * size + 0.5;
+    ctx.globalAlpha = (lat % 30 === 0) ? 0.35 : 0.18;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(size, y); ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.anisotropy = 4;
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false });
+  const grid = new THREE.Mesh(mapGeo.clone(), mat);
+  grid.position.set(0, -2.98, 0);
+  grid.rotation.x = -Math.PI / 2;
+  grid.renderOrder = -0.25;
+  scene.add(grid);
+})();
+
 // Optional boundaries overlay plane if local asset exists (loaded opportunistically)
 const boundaryMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.35, depthWrite: false });
 const boundaryPlane = new THREE.Mesh(mapGeo.clone(), boundaryMat);
@@ -360,15 +390,62 @@ window.addEventListener('resize', () => {
 // Live data: Blockchain.info WS unconfirmed txs -> pulses between random nodes
 const elConn = document.getElementById('conn');
 const elStats = document.getElementById('stats');
+const elLegend = document.getElementById('legend');
+const elNow = document.getElementById('metrics-now');
+const el5m = document.getElementById('metrics-5m');
 let txCountWindow = [];
+let txCountWindow5m = [];
+let txByContMinute = new Map();
+let totalPulseCount = 0;
+const nodesByCont = (() => {
+  const m = new Map();
+  nodeGroup.children.forEach((mesh) => {
+    const k = mesh.userData.continent || 'NA';
+    m.set(k, (m.get(k) || 0) + 1);
+  });
+  return m;
+})();
+
+function renderLegend() {
+  if (!elLegend) return;
+  elLegend.innerHTML = '';
+  Object.entries(CONTINENT_INFO).forEach(([code, info]) => {
+    const li = document.createElement('li');
+    const sw = document.createElement('span');
+    sw.className = 'swatch';
+    sw.style.background = `#${info.color.toString(16).padStart(6, '0')}`;
+    const name = document.createElement('span');
+    name.textContent = `${info.name} (${nodesByCont.get(code) || 0})`;
+    li.appendChild(sw); li.appendChild(name);
+    elLegend.appendChild(li);
+  });
+}
+renderLegend();
 let lastStatsUpdate = 0;
 
 function updateStats(now) {
   // Keep last 60s
   const cutoff = now - 60000;
   txCountWindow = txCountWindow.filter((t) => t >= cutoff);
+  // Keep last 5m
+  const cutoff5 = now - 300000;
+  txCountWindow5m = txCountWindow5m.filter((t) => t >= cutoff5);
   const perMin = txCountWindow.length;
   elStats.textContent = `TX/min: ${perMin}`;
+  if (elNow) {
+    elNow.innerHTML = '';
+    const add = (k, v) => { const li = document.createElement('li'); li.innerHTML = `<span>${k}</span><span>${v}</span>`; elNow.appendChild(li); };
+    add('TX/min', perMin);
+    add('Total pulses', totalPulseCount);
+  }
+  if (el5m) {
+    el5m.innerHTML = '';
+    const add = (k, v) => { const li = document.createElement('li'); li.innerHTML = `<span>${k}</span><span>${v}</span>`; el5m.appendChild(li); };
+    add('TX (5 min)', txCountWindow5m.length);
+    // Top continents by TX/min
+    const arr = Array.from(txByContMinute.entries()).sort((a,b) => b[1]-a[1]).slice(0,3);
+    arr.forEach(([code, n]) => add(`${CONTINENT_INFO[code]?.name || code} /min`, n));
+  }
 }
 
 let wsHandle;
@@ -392,9 +469,16 @@ try {
 
       const now = performance.now();
       txCountWindow.push(now);
+      txCountWindow5m.push(now);
+      totalPulseCount++;
+      // per-continent minute window
+      const prev = txByContMinute.get(ccode) || 0;
+      txByContMinute.set(ccode, prev + 1);
       if (now - lastStatsUpdate > 1000) {
         updateStats(now);
         lastStatsUpdate = now;
+        // decay per-continent counts roughly once a second
+        txByContMinute.forEach((v, k) => txByContMinute.set(k, Math.max(0, v - Math.round(v/60))));
       }
     },
     onError: () => {
