@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { connectUnconfirmedTxs } from './data/blockchainInfoWS.js';
+import { generateSampleNodes, computeCountryBackdrops } from './geo/sampleNodes.js';
+import { COUNTRIES } from './geo/countries.js';
 
 const canvas = document.getElementById('scene');
 
@@ -13,8 +15,8 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x070b14);
 
-const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
-camera.position.set(0, 40, 120);
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 5000);
+camera.position.set(0, 140, 420);
 scene.add(camera);
 
 // Lights
@@ -31,40 +33,86 @@ controls.dampingFactor = 0.05;
 controls.minDistance = 20;
 controls.maxDistance = 400;
 
-// Galaxy-like node distribution
-const nodeCount = 220;
-const radius = 80;
+// Geo-clustered node distribution
+const nodeData = generateSampleNodes();
 const nodes = [];
 
-const nodeGeom = new THREE.SphereGeometry(0.9, 16, 16);
+const nodeGeom = new THREE.SphereGeometry(1.1, 16, 16);
 const nodeMat = new THREE.MeshStandardMaterial({ color: 0xf7931a, emissive: 0x2a1200, metalness: 0.2, roughness: 0.4 });
 const nodeGroup = new THREE.Group();
 
-for (let i = 0; i < nodeCount; i++) {
-  // Random point in a sphere with slight disc bias
-  const r = radius * Math.cbrt(Math.random());
-  const theta = Math.random() * Math.PI * 2;
-  const phi = (Math.random() * 0.6 + 0.2) * Math.PI; // bias towards disc
-  const x = r * Math.sin(phi) * Math.cos(theta);
-  const y = r * (Math.random() * 0.15 - 0.075); // thin band
-  const z = r * Math.sin(phi) * Math.sin(theta);
-
+for (const n of nodeData) {
   const mesh = new THREE.Mesh(nodeGeom, nodeMat);
-  mesh.position.set(x, y, z);
+  mesh.position.set(n.x, n.y, n.z);
+  mesh.userData.country = n.country;
   nodes.push(mesh.position.clone());
   nodeGroup.add(mesh);
 }
 scene.add(nodeGroup);
 
-// Edges as line segments
-const connectionsPerNode = 2; // sparse graph to start
-const edgePositions = [];
+// Country backdrops under clusters (canvas textures with country codes)
+const backdropGroup = new THREE.Group();
+function makeBackdropTexture(code, sizePx = 256) {
+  const c = document.createElement('canvas');
+  c.width = sizePx;
+  c.height = sizePx;
+  const ctx = c.getContext('2d');
+  // background color per country hash
+  const h = Array.from(code).reduce((a, ch) => a + ch.charCodeAt(0), 0);
+  const hue = h % 360;
+  ctx.fillStyle = `hsla(${hue},70%,20%,0.5)`;
+  ctx.fillRect(0, 0, sizePx, sizePx);
+  ctx.strokeStyle = `hsla(${hue},80%,60%,0.8)`;
+  ctx.lineWidth = 10;
+  ctx.strokeRect(5, 5, sizePx - 10, sizePx - 10);
+  ctx.fillStyle = 'white';
+  ctx.font = `${Math.floor(sizePx * 0.28)}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const name = COUNTRIES[code]?.name || code;
+  ctx.fillText(code, sizePx / 2, sizePx * 0.42);
+  ctx.font = `${Math.floor(sizePx * 0.10)}px sans-serif`;
+  ctx.fillText(name, sizePx / 2, sizePx * 0.7);
+  const tex = new THREE.CanvasTexture(c);
+  tex.anisotropy = 4;
+  tex.needsUpdate = true;
+  return tex;
+}
 
+const backdrops = computeCountryBackdrops(nodeData);
+for (const b of backdrops) {
+  const tex = makeBackdropTexture(b.country);
+  const geo = new THREE.PlaneGeometry(b.size, b.size);
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.85, depthWrite: false });
+  const plane = new THREE.Mesh(geo, mat);
+  plane.position.set(b.x, -2.5, b.z);
+  plane.rotation.x = -Math.PI / 2; // lay flat on XZ
+  plane.renderOrder = 0;
+  backdropGroup.add(plane);
+}
+scene.add(backdropGroup);
+
+// Edges as line segments (prefer within-country connections)
+const connectionsPerNode = 2;
+const edgePositions = [];
+const nodeCount = nodeData.length;
 for (let i = 0; i < nodeCount; i++) {
   const connected = new Set();
+  const ci = nodeGroup.children[i].userData.country;
   while (connected.size < connectionsPerNode) {
-    const j = Math.floor(Math.random() * nodeCount);
-    if (j === i || connected.has(j)) continue;
+    // 70% chance connect within same country
+    let j;
+    if (Math.random() < 0.7) {
+      const same = nodeGroup.children
+        .map((m, idx) => ({ idx, c: m.userData.country }))
+        .filter(o => o.c === ci && o.idx !== i);
+      if (same.length === 0) continue;
+      j = same[Math.floor(Math.random() * same.length)].idx;
+    } else {
+      j = Math.floor(Math.random() * nodeCount);
+      if (j === i) continue;
+    }
+    if (connected.has(j)) continue;
     connected.add(j);
     edgePositions.push(nodes[i].x, nodes[i].y, nodes[i].z);
     edgePositions.push(nodes[j].x, nodes[j].y, nodes[j].z);
@@ -93,30 +141,17 @@ function addPulse(a, b) {
   // optional: slight scale flicker
 }
 
-// Starfield background
-const stars = (() => {
-  const starCount = 1000;
-  const positions = new Float32Array(starCount * 3);
-  for (let i = 0; i < starCount; i++) {
-    const r = 800 * Math.cbrt(Math.random());
-    const t = Math.random() * Math.PI * 2;
-    const p = Math.acos(2 * Math.random() - 1);
-    positions[i * 3 + 0] = r * Math.sin(p) * Math.cos(t);
-    positions[i * 3 + 1] = r * Math.cos(p);
-    positions[i * 3 + 2] = r * Math.sin(p) * Math.sin(t);
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  const m = new THREE.PointsMaterial({ size: 1, sizeAttenuation: true, color: 0xffffff, opacity: 0.85, transparent: true });
-  return new THREE.Points(g, m);
-})();
-scene.add(stars);
+// Subtle grid to ground the map
+const grid = new THREE.GridHelper(460, 46, 0x2d3847, 0x1a2432);
+grid.position.y = -3;
+scene.add(grid);
 
 // Animation loop
 function animate() {
   requestAnimationFrame(animate);
-  nodeGroup.rotation.y += 0.0008;
-  edges.rotation.y += 0.0008;
+  // light idle motion
+  nodeGroup.rotation.y += 0.0002;
+  edges.rotation.y += 0.0002;
   // Update pulses
   for (let i = pulses.length - 1; i >= 0; i--) {
     const p = pulses[i];

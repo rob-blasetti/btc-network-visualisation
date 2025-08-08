@@ -25,9 +25,25 @@ If you fork or rename the repo, update `base` in `vite.config.js` accordingly.
 ## Roadmap
 
 - Replace placeholder graph with live Bitcoin network data
+- Geographic layout by country with backdrops
 - Add clustering, link weighting, and node metrics
 - Add data source controls (local node / public API)
 - Add perf controls and level-of-detail
+
+## Update & Deploy
+
+To make changes and push them live on GitHub Pages:
+
+1. Edit code locally (e.g., files under `src/`).
+2. Preview locally: `npm install` then `npm run dev` and open the URL.
+3. Commit: `git add -A && git commit -m "feat: your change"`
+4. Push to `main`: `git push`
+5. GitHub Actions builds and deploys automatically to Pages. Wait ~1–3 minutes.
+
+Notes for geographic layout:
+- Country centroids and demo nodes live under `src/geo/`.
+- To add/adjust countries, edit `src/geo/countries.js` and `src/geo/sampleNodes.js`.
+- Backdrop images are generated from a canvas; replace with flag or map textures if desired.
 
 ## License
 
