@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
+import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js';
+import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
@@ -13,7 +16,7 @@ const canvas = document.getElementById('scene');
 
 // Renderer
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 const MAX_ANISO = renderer.capabilities.getMaxAnisotropy?.() || 4;
@@ -211,14 +214,16 @@ for (let i = 0; i < nodeCount; i++) {
   }
 }
 
-const edgeGeom = new THREE.BufferGeometry();
-edgeGeom.setAttribute('position', new THREE.Float32BufferAttribute(edgePositions, 3));
-const edgeMat = new THREE.LineBasicMaterial({ color: 0x6b8aa8, transparent: true, opacity: 0.65 });
-const edges = new THREE.LineSegments(edgeGeom, edgeMat);
+const edgeGeomSeg = new LineSegmentsGeometry();
+edgeGeomSeg.setPositions(edgePositions);
+const edgeMat2 = new LineMaterial({ color: 0xaec2d8, linewidth: 1.2, transparent: true, opacity: 0.85, depthWrite: false });
+edgeMat2.resolution.set(window.innerWidth, window.innerHeight);
+const edges = new LineSegments2(edgeGeomSeg, edgeMat2);
 scene.add(edges);
-// Add a soft additive glow for edges
-const edgeGlowMat = new THREE.LineBasicMaterial({ color: 0x98b7d6, transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending, depthWrite: false });
-const edgesGlow = new THREE.LineSegments(edgeGeom.clone(), edgeGlowMat);
+// Soft additive glow overlay
+const edgeGlowMat2 = new LineMaterial({ color: 0x8fb2d0, linewidth: 3.0, transparent: true, opacity: 0.08, blending: THREE.AdditiveBlending, depthWrite: false });
+edgeGlowMat2.resolution.set(window.innerWidth, window.innerHeight);
+const edgesGlow = new LineSegments2(edgeGeomSeg, edgeGlowMat2);
 edgesGlow.position.y = 0.01;
 scene.add(edgesGlow);
 
@@ -405,11 +410,14 @@ window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
   composer.setSize(window.innerWidth, window.innerHeight);
   // update FXAA resolution (1 / pixel)
   const pr = renderer.getPixelRatio();
   fxaaPass.material.uniforms['resolution'].value.set(1 / (window.innerWidth * pr), 1 / (window.innerHeight * pr));
+  // update wide line materials
+  edgeMat2.resolution.set(window.innerWidth, window.innerHeight);
+  edgeGlowMat2.resolution.set(window.innerWidth, window.innerHeight);
 });
 
 // TODO: Replace mock graph with live Bitcoin network data.
