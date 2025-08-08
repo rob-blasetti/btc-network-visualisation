@@ -55,6 +55,8 @@ body {
 .hud-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 #overlay h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: 0.2px; }
 .explain { margin: 8px 0 12px 0; opacity: 0.9; font-size: 13px; color: var(--muted); }
+#overlay .hdr-stats { display: flex; gap: 10px; align-items: center; opacity: 0.9; font-size: 12px; }
+#overlay .hdr-stats span { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 4px 8px; }
 #overlay .tabs { display: flex; gap: 8px; margin: 8px 0; }
 .tab { pointer-events: auto; background: rgba(255,255,255,0.06); color: #e6edf3; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 6px 10px; font-size: 12px; }
 .tab.active { background: rgba(90,120,160,0.25); border-color: rgba(120,160,200,0.35); }
@@ -80,6 +82,7 @@ body {
 @media (max-width: 768px) {
   #overlay .hud { max-width: 96vw; padding: 10px 12px; }
   #overlay h1 { font-size: 16px; }
+  #overlay .hdr-stats { flex-wrap: wrap; gap: 6px; font-size: 11px; }
   .explain { display: none; }
   #overlay .tabs { margin-top: 6px; }
   .panel { gap: 12px; }

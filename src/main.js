@@ -405,6 +405,8 @@ function animate() {
 
   // Mining updates
   updateMining(performance.now());
+  // Header stats update for both tabs
+  updateHeaderStats();
 
   controls.update();
   composer.render();
@@ -464,6 +466,11 @@ const elAttempts = document.getElementById('mining-attempts');
 const elElapsed = document.getElementById('mining-elapsed');
 const elProgress = document.getElementById('mining-progress');
 const elWinner = document.getElementById('mining-winner');
+// Header compact stats
+const elHdrHeight = document.getElementById('hdr-height');
+const elHdrSince = document.getElementById('hdr-since');
+const elHdrEta = document.getElementById('hdr-eta');
+const elHdrSubsidy = document.getElementById('hdr-subsidy');
 let txCountWindow = [];
 let txCountWindow5m = [];
 let txByContMinute = new Map();
@@ -744,6 +751,17 @@ function updateMining(now) {
       // restart new round after short delay
       setTimeout(() => { stopMining(); startMining(); }, 1200);
     }
+  }
+}
+
+function updateHeaderStats() {
+  if (elHdrHeight && mining.tipHeight) elHdrHeight.textContent = String(mining.tipHeight);
+  if (elHdrSubsidy && mining.rewardBTC != null) elHdrSubsidy.textContent = `${fmt(mining.rewardBTC)} BTC`;
+  if (mining.lastBlockTs) {
+    const sinceSec = Math.max(0, (Date.now() - mining.lastBlockTs) / 1000);
+    const eta = Math.max(0, 600 - sinceSec);
+    if (elHdrSince) elHdrSince.textContent = `${sinceSec.toFixed(0)}s`;
+    if (elHdrEta) elHdrEta.textContent = `${eta.toFixed(0)}s`;
   }
 }
 
