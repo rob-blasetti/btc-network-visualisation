@@ -50,6 +50,24 @@ controls.rotateSpeed = 0.6;
 controls.minDistance = 5;
 controls.maxDistance = 800;
 
+// DOM elements (queried early so animation loop can reference them)
+const elConn = document.getElementById('conn');
+const elStats = document.getElementById('stats');
+const elLegend = document.getElementById('legend');
+const elNow = document.getElementById('metrics-now');
+const el5m = document.getElementById('metrics-5m');
+const elMiningUI = document.getElementById('mining-ui');
+const elTabNetwork = document.getElementById('tab-network');
+const elTabMining = document.getElementById('tab-mining');
+const elReward = document.getElementById('mining-reward');
+const elHeight = document.getElementById('mining-height');
+const elSince = document.getElementById('mining-since');
+const elEta = document.getElementById('mining-eta');
+const elAttempts = document.getElementById('mining-attempts');
+const elElapsed = document.getElementById('mining-elapsed');
+const elProgress = document.getElementById('mining-progress');
+const elWinner = document.getElementById('mining-winner');
+
 // Geo-clustered node distribution
 const nodeData = generateSampleNodes();
 const nodes = [];
@@ -450,22 +468,6 @@ if (hudEl && hudToggle) {
 // Potential sources: mempool.space websocket, Bitcoin Core ZMQ, or public APIs.
 
 // Live data: Blockchain.info WS unconfirmed txs -> pulses between random nodes
-const elConn = document.getElementById('conn');
-const elStats = document.getElementById('stats');
-const elLegend = document.getElementById('legend');
-const elNow = document.getElementById('metrics-now');
-const el5m = document.getElementById('metrics-5m');
-const elMiningUI = document.getElementById('mining-ui');
-const elTabNetwork = document.getElementById('tab-network');
-const elTabMining = document.getElementById('tab-mining');
-const elReward = document.getElementById('mining-reward');
-const elHeight = document.getElementById('mining-height');
-const elSince = document.getElementById('mining-since');
-const elEta = document.getElementById('mining-eta');
-const elAttempts = document.getElementById('mining-attempts');
-const elElapsed = document.getElementById('mining-elapsed');
-const elProgress = document.getElementById('mining-progress');
-const elWinner = document.getElementById('mining-winner');
 // Header compact stats
 const elHdrHeight = document.getElementById('hdr-height');
 const elHdrSince = document.getElementById('hdr-since');
