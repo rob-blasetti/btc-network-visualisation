@@ -50,3 +50,12 @@ body {
   font-size: 12px;
 }
 
+#status {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+#conn.ok { color: #29d398; }
+#conn.err { color: #ff6b6b; }

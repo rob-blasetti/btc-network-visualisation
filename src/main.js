@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { connectUnconfirmedTxs } from './data/blockchainInfoWS.js';
 
 const canvas = document.getElementById('scene');
 
@@ -31,7 +32,7 @@ controls.minDistance = 20;
 controls.maxDistance = 400;
 
 // Galaxy-like node distribution
-const nodeCount = 180;
+const nodeCount = 220;
 const radius = 80;
 const nodes = [];
 
@@ -76,6 +77,22 @@ const edgeMat = new THREE.LineBasicMaterial({ color: 0x425a75, transparent: true
 const edges = new THREE.LineSegments(edgeGeom, edgeMat);
 scene.add(edges);
 
+// Pulses for live transactions
+const pulses = [];
+const pulseGeom = new THREE.SphereGeometry(0.25, 12, 12);
+const pulseMat = new THREE.MeshBasicMaterial({ color: 0xffc680 });
+
+function addPulse(a, b) {
+  const mesh = new THREE.Mesh(pulseGeom, pulseMat.clone());
+  mesh.position.copy(a);
+  mesh.material.transparent = true;
+  mesh.material.opacity = 1.0;
+  const speed = 0.012 + Math.random() * 0.02; // lerp per frame
+  pulses.push({ mesh, a: a.clone(), b: b.clone(), t: 0, speed });
+  scene.add(mesh);
+  // optional: slight scale flicker
+}
+
 // Starfield background
 const stars = (() => {
   const starCount = 1000;
@@ -100,6 +117,20 @@ function animate() {
   requestAnimationFrame(animate);
   nodeGroup.rotation.y += 0.0008;
   edges.rotation.y += 0.0008;
+  // Update pulses
+  for (let i = pulses.length - 1; i >= 0; i--) {
+    const p = pulses[i];
+    p.t += p.speed;
+    if (p.t >= 1) {
+      scene.remove(p.mesh);
+      pulses.splice(i, 1);
+      continue;
+    }
+    const pos = new THREE.Vector3().lerpVectors(p.a, p.b, p.t);
+    p.mesh.position.copy(pos);
+    p.mesh.material.opacity = 1 - Math.abs(0.5 - p.t) * 2; // fade in/out
+  }
+
   controls.update();
   renderer.render(scene, camera);
 }
@@ -116,3 +147,62 @@ window.addEventListener('resize', () => {
 // TODO: Replace mock graph with live Bitcoin network data.
 // Potential sources: mempool.space websocket, Bitcoin Core ZMQ, or public APIs.
 
+// Live data: Blockchain.info WS unconfirmed txs -> pulses between random nodes
+const elConn = document.getElementById('conn');
+const elStats = document.getElementById('stats');
+let txCountWindow = [];
+let lastStatsUpdate = 0;
+
+function updateStats(now) {
+  // Keep last 60s
+  const cutoff = now - 60000;
+  txCountWindow = txCountWindow.filter((t) => t >= cutoff);
+  const perMin = txCountWindow.length;
+  elStats.textContent = `TX/min: ${perMin}`;
+}
+
+let wsHandle;
+try {
+  wsHandle = connectUnconfirmedTxs({
+    onOpen: () => {
+      elConn.textContent = 'Live: connected';
+      elConn.classList.remove('err');
+      elConn.classList.add('ok');
+    },
+    onTx: () => {
+      // Choose two random nodes to animate between
+      if (nodes.length < 2) return;
+      let i = Math.floor(Math.random() * nodes.length);
+      let j = Math.floor(Math.random() * nodes.length);
+      if (i === j) j = (j + 1) % nodes.length;
+      addPulse(nodes[i], nodes[j]);
+
+      const now = performance.now();
+      txCountWindow.push(now);
+      if (now - lastStatsUpdate > 1000) {
+        updateStats(now);
+        lastStatsUpdate = now;
+      }
+    },
+    onError: () => {
+      elConn.textContent = 'Live: error';
+      elConn.classList.remove('ok');
+      elConn.classList.add('err');
+    },
+    onClose: () => {
+      elConn.textContent = 'Live: disconnected';
+      elConn.classList.remove('ok');
+      elConn.classList.add('err');
+    },
+  });
+} catch (e) {
+  elConn.textContent = 'Live: unavailable';
+  elConn.classList.add('err');
+}
+
+// Clean up on hot reload
+if (import.meta && import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    try { wsHandle?.close(); } catch {}
+  });
+}
