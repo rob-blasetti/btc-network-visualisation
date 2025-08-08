@@ -15,6 +15,8 @@ import { COUNTRIES } from './geo/countries.js';
 import { CONTINENT_INFO } from './geo/continents.js';
 
 const canvas = document.getElementById('scene');
+const svgOverlay = document.getElementById('svg-overlay');
+const tooltip = document.getElementById('tooltip');
 
 // Renderer
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -103,6 +105,46 @@ for (const n of nodeData) {
   nodeGroup.add(mesh);
 }
 scene.add(nodeGroup);
+
+// Hover highlight & tooltip
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+let hoverIdx = -1;
+let hoverHalo;
+function ensureHalo() {
+  if (hoverHalo) return hoverHalo;
+  const size = 128; const c = document.createElement('canvas'); c.width = c.height = size;
+  const ctx = c.getContext('2d'); const g = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+  g.addColorStop(0, 'rgba(255,255,255,0.9)'); g.addColorStop(0.4, 'rgba(255,255,255,0.4)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(size/2, size/2, size/2, 0, Math.PI*2); ctx.fill();
+  const tex = new THREE.CanvasTexture(c); tex.anisotropy = MAX_ANISO;
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending, opacity: 0.9 });
+  hoverHalo = new THREE.Sprite(mat);
+  hoverHalo.scale.set(5, 5, 1);
+  scene.add(hoverHalo);
+  return hoverHalo;
+}
+function screenFromWorld(pos) {
+  const v = pos.clone().project(camera);
+  const x = (v.x * 0.5 + 0.5) * renderer.domElement.clientWidth;
+  const y = (-v.y * 0.5 + 0.5) * renderer.domElement.clientHeight;
+  return { x, y };
+}
+function setTooltip(text, x, y) {
+  if (!tooltip) return;
+  if (!text) { tooltip.classList.add('hidden'); return; }
+  tooltip.textContent = text;
+  tooltip.style.left = Math.round(x + 12) + 'px';
+  tooltip.style.top = Math.round(y + 12) + 'px';
+  tooltip.classList.remove('hidden');
+}
+function handlePointerMove(e) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  const cx = (e.clientX - rect.left) / rect.width;
+  const cy = (e.clientY - rect.top) / rect.height;
+  pointer.set(cx * 2 - 1, -(cy * 2 - 1));
+}
+window.addEventListener('pointermove', handlePointerMove);
 
 // Country backdrops under clusters (canvas textures with country codes)
 const backdropGroup = new THREE.Group();
@@ -453,6 +495,25 @@ function animate() {
   updateMining(performance.now());
   // Header stats update for both tabs
   updateHeaderStats();
+
+  // Raycast hover
+  raycaster.setFromCamera(pointer, camera);
+  const intersects = raycaster.intersectObjects(nodeGroup.children, true);
+  if (intersects.length > 0) {
+    const obj = intersects[0].object;
+    const idx = nodeGroup.children.indexOf(obj);
+    const halo = ensureHalo();
+    halo.position.copy(obj.position).add(new THREE.Vector3(0, 0.5, 0));
+    hoverIdx = idx;
+    const country = obj.userData.country;
+    const cont = obj.userData.continent;
+    const label = `${country || 'Node'}${cont ? ` · ${CONTINENT_INFO[cont]?.name || cont}` : ''}`;
+    const s2 = screenFromWorld(obj.position);
+    setTooltip(label, s2.x, s2.y);
+  } else {
+    setTooltip('', 0, 0);
+    hoverIdx = -1;
+  }
 
   controls.update();
   composer.render();

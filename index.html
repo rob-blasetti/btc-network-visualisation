@@ -11,6 +11,7 @@
   <body>
     <div id="app">
       <canvas id="scene"></canvas>
+      <svg id="svg-overlay" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg>
       <button id="hud-toggle" aria-label="Toggle HUD">HUD</button>
       <div id="overlay">
         <div class="hud">
@@ -25,6 +26,29 @@
               <span title="Since last block">Since: <b id="hdr-since">—</b></span>
               <span title="ETA to next block">ETA: <b id="hdr-eta">—</b></span>
               <span title="Subsidy">Subsidy: <b id="hdr-subsidy">—</b></span>
+            </div>
+          </div>
+          <div class="panel how">
+            <div class="col">
+              <h3>How It Works</h3>
+              <ul class="legend">
+                <li>
+                  <svg width="18" height="18" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" fill="#f7931a"/></svg>
+                  <span>Nodes: peers grouped by country & colored by continent.</span>
+                </li>
+                <li>
+                  <svg width="18" height="18" viewBox="0 0 24 24"><path d="M3 12H21" stroke="#6b8aa8" stroke-width="2"/></svg>
+                  <span>Edges: indicative peer links. Glow highlights activity.</span>
+                </li>
+                <li>
+                  <svg width="18" height="18" viewBox="0 0 24 24"><defs><radialGradient id="leg-g1"><stop offset="0%" stop-color="#ffa34d"/><stop offset="100%" stop-color="#ffa34d" stop-opacity="0"/></radialGradient></defs><circle cx="12" cy="12" r="8" fill="url(#leg-g1)"/></svg>
+                  <span>Pulses: transactions traveling between random nodes.</span>
+                </li>
+                <li>
+                  <svg width="18" height="18" viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="2" fill="#1e2a38"/></svg>
+                  <span>Mining: block appears; reward coin flows to winner.</span>
+                </li>
+              </ul>
             </div>
           </div>
           <div class="tabs">
@@ -87,6 +111,7 @@
         </div>
       </div>
     </div>
+    <div id="tooltip" class="tooltip hidden"></div>
     <script type="module" data-cfasync="false" src="/src/main.js"></script>
   </body>
   </html>
