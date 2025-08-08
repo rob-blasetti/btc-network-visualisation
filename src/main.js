@@ -16,7 +16,9 @@ const canvas = document.getElementById('scene');
 
 // Renderer
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+function isMobile() { return window.matchMedia('(max-width: 768px)').matches || 'ontouchstart' in window; }
+function getMaxPixelRatio() { return isMobile() ? 1.25 : 1.75; }
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, getMaxPixelRatio()));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 const MAX_ANISO = renderer.capabilities.getMaxAnisotropy?.() || 4;
@@ -216,12 +218,12 @@ for (let i = 0; i < nodeCount; i++) {
 
 const edgeGeomSeg = new LineSegmentsGeometry();
 edgeGeomSeg.setPositions(edgePositions);
-const edgeMat2 = new LineMaterial({ color: 0xaec2d8, linewidth: 1.2, transparent: true, opacity: 0.85, depthWrite: false });
+const edgeMat2 = new LineMaterial({ color: 0xaec2d8, linewidth: isMobile() ? 1.6 : 1.2, transparent: true, opacity: 0.85, depthWrite: false });
 edgeMat2.resolution.set(window.innerWidth, window.innerHeight);
 const edges = new LineSegments2(edgeGeomSeg, edgeMat2);
 scene.add(edges);
 // Soft additive glow overlay
-const edgeGlowMat2 = new LineMaterial({ color: 0x8fb2d0, linewidth: 3.0, transparent: true, opacity: 0.08, blending: THREE.AdditiveBlending, depthWrite: false });
+const edgeGlowMat2 = new LineMaterial({ color: 0x8fb2d0, linewidth: isMobile() ? 3.8 : 3.0, transparent: true, opacity: 0.08, blending: THREE.AdditiveBlending, depthWrite: false });
 edgeGlowMat2.resolution.set(window.innerWidth, window.innerHeight);
 const edgesGlow = new LineSegments2(edgeGeomSeg, edgeGlowMat2);
 edgesGlow.position.y = 0.01;
@@ -410,7 +412,7 @@ window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, getMaxPixelRatio()));
   composer.setSize(window.innerWidth, window.innerHeight);
   // update FXAA resolution (1 / pixel)
   const pr = renderer.getPixelRatio();
@@ -418,7 +420,25 @@ window.addEventListener('resize', () => {
   // update wide line materials
   edgeMat2.resolution.set(window.innerWidth, window.innerHeight);
   edgeGlowMat2.resolution.set(window.innerWidth, window.innerHeight);
+  // adjust line widths for device
+  edgeMat2.linewidth = isMobile() ? 1.6 : 1.2;
+  edgeGlowMat2.linewidth = isMobile() ? 3.8 : 3.0;
 });
+
+// HUD toggle for mobile
+const hudEl = document.querySelector('#overlay .hud');
+const hudToggle = document.getElementById('hud-toggle');
+if (hudEl && hudToggle) {
+  const setCollapsed = (collapsed) => {
+    hudEl.classList.toggle('collapsed', collapsed);
+  };
+  // auto-collapse on mobile on load
+  setCollapsed(isMobile());
+  hudToggle.addEventListener('click', () => {
+    const isColl = hudEl.classList.contains('collapsed');
+    setCollapsed(!isColl);
+  });
+}
 
 // TODO: Replace mock graph with live Bitcoin network data.
 // Potential sources: mempool.space websocket, Bitcoin Core ZMQ, or public APIs.
