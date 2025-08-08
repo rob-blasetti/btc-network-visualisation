@@ -8,6 +8,7 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js';
 import { connectUnconfirmedTxs } from './data/blockchainInfoWS.js';
+import { subscribeTip, computeSubsidy } from './data/blockInfo.js';
 import { generateSampleNodes, computeCountryBackdrops } from './geo/sampleNodes.js';
 import { COUNTRIES } from './geo/countries.js';
 import { CONTINENT_INFO } from './geo/continents.js';
@@ -456,6 +457,9 @@ const elMiningUI = document.getElementById('mining-ui');
 const elTabNetwork = document.getElementById('tab-network');
 const elTabMining = document.getElementById('tab-mining');
 const elReward = document.getElementById('mining-reward');
+const elHeight = document.getElementById('mining-height');
+const elSince = document.getElementById('mining-since');
+const elEta = document.getElementById('mining-eta');
 const elAttempts = document.getElementById('mining-attempts');
 const elElapsed = document.getElementById('mining-elapsed');
 const elProgress = document.getElementById('mining-progress');
@@ -574,7 +578,6 @@ if (import.meta && import.meta.hot) {
 // -----------------
 // Mining mode setup
 // -----------------
-const MINING_REWARD_BTC = 3.125;
 function fmt(n) { return Intl.NumberFormat('en-US', { maximumFractionDigits: 3 }).format(n); }
 
 const mining = {
@@ -587,6 +590,9 @@ const mining = {
   winnerIdx: -1,
   sprites: [],
   coin: null,
+  rewardBTC: 3.125,
+  tipHeight: 0,
+  lastBlockTs: 0,
 };
 
 function makeBlockMesh() {
@@ -599,7 +605,7 @@ function makeBlockMesh() {
   return mesh;
 }
 
-function makeCoinTexture(text = `${MINING_REWARD_BTC} BTC`) {
+function makeCoinTexture(text = `${mining.rewardBTC} BTC`) {
   const size = 256;
   const c = document.createElement('canvas'); c.width = size; c.height = size;
   const ctx = c.getContext('2d');
@@ -659,7 +665,7 @@ function startMining() {
   mining.block = mining.block || makeBlockMesh();
   scene.add(mining.block);
   // UI
-  elReward && (elReward.textContent = `${fmt(MINING_REWARD_BTC)} BTC`);
+  elReward && (elReward.textContent = `${fmt(mining.rewardBTC)} BTC`);
   elWinner && (elWinner.textContent = '—');
 }
 
@@ -705,9 +711,18 @@ function updateMining(now) {
   const pct = Math.min(100, Math.floor((mining.attempts / mining.target) * 100));
   if (elProgress) elProgress.style.width = pct + '%';
 
+  // Height and ETA
+  if (elHeight && mining.tipHeight) elHeight.textContent = mining.tipHeight.toString();
+  if (mining.lastBlockTs) {
+    const sinceSec = Math.max(0, (Date.now() - mining.lastBlockTs) / 1000);
+    if (elSince) elSince.textContent = `${sinceSec.toFixed(0)}s`;
+    const eta = Math.max(0, 600 - sinceSec);
+    if (elEta) elEta.textContent = `${eta.toFixed(0)}s`;
+  }
+
   // winner handling: spawn coin and fly to winner
   if (mining.winnerIdx >= 0 && !mining.coin) {
-    const tex = makeCoinTexture(`${MINING_REWARD_BTC} BTC`);
+    const tex = makeCoinTexture(`${mining.rewardBTC} BTC`);
     const mat = new THREE.SpriteMaterial({ map: tex, transparent: true });
     const coin = new THREE.Sprite(mat);
     coin.scale.set(10, 10, 1);
@@ -748,3 +763,18 @@ function setModeMining(on) {
 }
 elTabNetwork?.addEventListener('click', () => setModeMining(false));
 elTabMining?.addEventListener('click', () => setModeMining(true));
+
+// Live block tip subscription
+let stopTip;
+try {
+  stopTip = subscribeTip({
+    intervalMs: 15000,
+    onUpdate: ({ height, timestamp }) => {
+      mining.tipHeight = height;
+      mining.lastBlockTs = timestamp;
+      mining.rewardBTC = computeSubsidy(height);
+      if (elReward) elReward.textContent = `${fmt(mining.rewardBTC)} BTC`;
+      if (elHeight) elHeight.textContent = `${height}`;
+    },
+  });
+} catch {}
