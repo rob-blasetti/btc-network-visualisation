@@ -8,6 +8,7 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js';
 import { connectUnconfirmedTxs } from './data/blockchainInfoWS.js';
+import { connectMempoolWS } from './data/mempoolWS.js';
 import { subscribeTip, computeSubsidy } from './data/blockInfo.js';
 import { generateSampleNodes, computeCountryBackdrops } from './geo/sampleNodes.js';
 import { COUNTRIES } from './geo/countries.js';
@@ -537,6 +538,7 @@ function updateStats(now) {
 }
 
 let wsHandle;
+let wsMempool;
 try {
   wsHandle = connectUnconfirmedTxs({
     onOpen: () => {
@@ -585,10 +587,44 @@ try {
   elConn.classList.add('err');
 }
 
+// Secondary source: mempool.space WS for blocks + optional txs (sampled)
+try {
+  wsMempool = connectMempoolWS({
+    onOpen: () => {
+      // show both when available
+      elConn.textContent = 'Live: connected (2)';
+      elConn.classList.remove('err');
+      elConn.classList.add('ok');
+    },
+    onBlock: ({ height, timestamp }) => {
+      // Update mining tip instantly when blocks arrive
+      if (!mining) return;
+      mining.tipHeight = height || mining.tipHeight;
+      mining.lastBlockTs = timestamp || mining.lastBlockTs;
+      // Reset/start mining simulation on new block
+      if (height) {
+        stopMining();
+        startMining();
+      }
+    },
+    onTx: () => {
+      // To avoid overloading pulses, sample mempool txs at ~20%
+      if (Math.random() > 0.2 || nodes.length < 2) return;
+      let i = Math.floor(Math.random() * nodes.length);
+      let j = Math.floor(Math.random() * nodes.length);
+      if (i === j) j = (j + 1) % nodes.length;
+      const ccode = nodeGroup.children[i].userData.continent;
+      const col = CONTINENT_INFO[ccode]?.color ?? 0xffa34d;
+      addPulse(nodes[i], nodes[j], col);
+    },
+  });
+} catch {}
+
 // Clean up on hot reload
 if (import.meta && import.meta.hot) {
   import.meta.hot.dispose(() => {
     try { wsHandle?.close(); } catch {}
+    try { wsMempool?.close(); } catch {}
   });
 }
 
