@@ -73,6 +73,9 @@ var elHdrSince = document.getElementById('hdr-since');
 var elHdrEta = document.getElementById('hdr-eta');
 var elHdrSubsidy = document.getElementById('hdr-subsidy');
 
+// Mining state placeholder to avoid TDZ if referenced before initialization
+var mining = null;
+
 // Geo-clustered node distribution
 const nodeData = generateSampleNodes();
 const nodes = [];
@@ -589,7 +592,7 @@ if (import.meta && import.meta.hot) {
 // -----------------
 function fmt(n) { return Intl.NumberFormat('en-US', { maximumFractionDigits: 3 }).format(n); }
 
-const mining = {
+mining = {
   active: false,
   block: null,
   miners: [],
@@ -687,7 +690,7 @@ function stopMining() {
 }
 
 function updateMining(now) {
-  if (!mining.active) return;
+  if (!mining || !mining.active) return;
   // spin block
   mining.block.rotation.y += 0.01;
   // spawn attempts
